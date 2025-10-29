@@ -31,7 +31,7 @@ const Homepage = async () => {
       <h1 className="h1-bold text-center mt-10 mb-8">Benvenuto su ProStore</h1>
 
       {/* Ora latestProducts è garantito essere Product[] (non Product[] | null) */}
-      <ProductList data={latestProducts} title="Newest Arrivals" />
+      <ProductList data={latestProducts} title="Nuovi Arrivi" />
     </div>
   );
 };
