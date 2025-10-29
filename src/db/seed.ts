@@ -1,33 +1,57 @@
-import * as dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { PrismaClient } from '@prisma/client';
-import sampleData from './sample-data.ts'; 
+import * as dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+import { PrismaClient } from "@prisma/client";
+import sampleData from "./sample-data.js";
+import { hash } from "bcrypt-ts-edge"; 
+
 
 // 💡 CORREZIONE: Ottiene la directory del file corrente
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // 💡 NUOVA CONFIGURAZIONE DOTENV: Carica il .env due livelli sopra (nella root)
 // Visto che seed.ts è in src/db/, risaliamo due volte per trovare la root.
-const envPath = path.join(__dirname, '..', '..', '.env.local'); 
-dotenv.config({ path: envPath }); 
-console.log('--- DEBUG INFO ---'); // 👈 NUOVO
-console.log('Percorso .env risolto:', envPath); // 👈 NUOVO
-console.log('DATABASE_URL trovata:', process.env.DATABASE_URL ? 'SÌ' : 'NO'); // 👈 NUOVO
-console.log('------------------'); // 👈 NUOVO
+const envPath = path.join(__dirname, "..", "..", ".env.local");
+dotenv.config({ path: envPath });
+console.log("--- DEBUG INFO ---"); // 👈 NUOVO
+console.log("Percorso .env risolto:", envPath); // 👈 NUOVO
+console.log("DATABASE_URL trovata:", process.env.DATABASE_URL ? "SÌ" : "NO"); // 👈 NUOVO
+console.log("------------------"); // 👈 NUOVO
 
 const prisma = new PrismaClient();
-
-
+const saltRounds = 10;
 
 async function main() {
-  console.log('Inizio seeding...');
+  console.log("Inizio seeding...");
+
+  // 1. ELIMINA i dati vecchi (consigliato per i seed)
+  await prisma.user.deleteMany(); // <--- AGGIUNTO: Elimina tutti gli utenti
+  console.log("Utenti esistenti eliminati.");
 
   // 1. ELIMINA i dati vecchi (opzionale ma consigliato per i seed)
   await prisma.product.deleteMany();
-  console.log('Prodotti esistenti eliminati.');
+  console.log("Prodotti esistenti eliminati.");
 
-  // 2. CREA i nuovi prodotti
+  // . CREA i nuovi utenti
+
+  for (const user of sampleData.users) {
+      // Esegui l'hashing della password PRIMA di inserirla nel DB
+    const hashedPassword = await hash(user.password, saltRounds);
+
+    await prisma.user.create({
+      data: {
+        name: user.name,
+        email: user.email,
+        password: hashedPassword,
+        role: user.role,
+      },
+    });
+  }
+  console.log(
+    `Seeding completato. Inseriti ${sampleData.users.length} utenti.`
+  );
+
+  // 3. CREA i nuovi prodotti
   for (const product of sampleData.products) {
     // Inserisce i dati nel database
     await prisma.product.create({
@@ -37,7 +61,7 @@ async function main() {
         category: product.category,
         description: product.description,
         // Prisma supporta direttamente i tipi Array<string>
-        images: product.images, 
+        images: product.images,
         price: product.price,
         brand: product.brand,
         rating: product.rating,
@@ -49,12 +73,14 @@ async function main() {
     });
   }
 
-  console.log(`Seeding completato. Inseriti ${sampleData.products.length} prodotti.`);
+  console.log(
+    `Seeding completato. Inseriti ${sampleData.products.length} prodotti.`
+  );
 }
 
 main()
-  .catch(e => {
-    console.error('Errore durante il seeding:', e);
+  .catch((e) => {
+    console.error("Errore durante il seeding:", e);
     process.exit(1);
   })
   .finally(async () => {

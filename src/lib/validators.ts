@@ -1,4 +1,4 @@
-import z from "zod";
+import z, { email } from "zod";
 import { formatNumberWithDecimal } from "./utils";
 
 const currency =  z
@@ -20,6 +20,25 @@ export const insertProductschema = z.object({
   banner: z.string().nullable(),
   price: currency,
 });
+
+// Schema for signin User in 
+export const signInFormSchema = z.object({
+    email: z.string().email("Indirizzo email non valido"),
+    password: z.string().min(6, "La password deve avere almeno 6 caratteri ")
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Assumendo che questo sia parte di una catena di validazione Zod:
 
 /**

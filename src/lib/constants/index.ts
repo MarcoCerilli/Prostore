@@ -4,6 +4,12 @@ export const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL||'http://localhost:
 
 export const LATEST_PRODUCTS_LIMIT = Number (process.env.LATEST_PRODUCTS_LIMIT) || 4; 
 
+
+export const signInDefaultValues = {
+    email:"",
+    password: "",
+};
+
 /*
  * =================================================================================
  * NOTE DI RIPASSO CRITICHE PER PRISMA, NEXT.JS E TYPESCRIPT

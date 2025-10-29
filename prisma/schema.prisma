@@ -5,29 +5,93 @@ generator client {
 datasource db {
     provider = "postgresql"
     url      = env("DATABASE_URL")
-    
 }
 
 model Product {
-    // Usiamo l'alias di Prisma `uuid()` che è più leggibile
-    id String @id @default(uuid()) @db.Uuid 
-    
-    name String 
-    slug String @unique(map: "product_slug_idx")
-    category String
-    images String[]
-    brand String
-    description String
-    stock Int
-    
-    // Tipi Decimal per prezzo e rating sono ottimi per la precisione
-    price Decimal @default(0) @db.Decimal(12,2) 
-    rating Decimal @default(0) @db.Decimal(3,2) 
-    
-    numReviews Int @default(0)
+    // ID corretto come UUID
+    id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+    name          String
+    slug          String   @unique(map: "product_slug_idx")
+    category      String
+    images        String[]
+    brand         String
+    description   String
+    stock         Int
+
+    price    Decimal @default(0) @db.Decimal(12, 2)
+    rating   Decimal @default(0) @db.Decimal(3, 2)
+
+    numReviews Int     @default(0)
     isFeatured Boolean @default(false)
-    banner String?
-    
-    // Tipi DateTime corretti per i timestamp
+    banner     String?
+
     createdAt DateTime @default(now()) @db.Timestamp(6)
+}
+
+model User {
+    // ID corretto come UUID
+    id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+    name          String?   @default("NO_NAME")
+    email         String?   @unique(map: "user_email_idx")
+    emailVerified DateTime? @db.Timestamp(6)
+    image         String?
+    password      String?
+    role          String    @default("user")
+    address       Json?     @db.Json
+    paymentMethod String?
+    createdAt     DateTime  @default(now()) @db.Timestamp(6)
+    updatedAt     DateTime  @updatedAt
+    account       Account[]
+    Session       Session[]
+}
+
+model Account {
+    // ID corretto come UUID
+    id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid // Ho aggiunto @id e @default(dbgenerated("gen_random_uuid()"))
+
+    // CHIAVE ESTERNA CORRETTA: userId è String in Prisma, ma UUID nel DB
+    userId            String  @map("user_id") @db.Uuid 
+    
+    type              String
+    provider          String
+    providerAccountId String  @map("provider_account_id")
+    refresh_token     String? @db.Text
+    access_token      String? @db.Text
+    expires_at        Int?
+    token_type        String?
+    scope             String?
+    id_token          String? @db.Text
+    session_state     String?
+    createdAt         DateTime @default(now()) @db.Timestamp(6)
+    updatedAt         DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([provider, providerAccountId]) // Unique key per NextAuth
+    @@map("accounts") // Mappatura standard NextAuth per le tabelle
+}
+
+model Session {
+    sessionToken String  @id
+    
+    // CHIAVE ESTERNA CORRETTA: userId è String in Prisma, ma UUID nel DB
+    userId       String  @db.Uuid
+    
+    expires      DateTime @db.Timestamp(6)
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt    DateTime @default(now()) @db.Timestamp(6)
+    updatedAt    DateTime @updatedAt
+    
+    @@map("sessions") // Mappatura standard NextAuth
+}
+
+model VerificationToken {
+    identifier String
+    token      String
+    expires    DateTime
+
+    @@unique([token]) // Unicità del token
+    @@map("verificationtokens") // Mappatura standard NextAuth
+    @@id([identifier, token]) // NextAuth usa entrambi come ID
 }

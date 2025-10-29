@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
+    "target": "ES2020",
     "lib": [
       "dom",
       "dom.iterable",
@@ -15,11 +15,8 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
-    // 💡 CORREZIONE: Permette l'importazione di file .ts con l'estensione nel percorso.
-    // Questo risolve l'errore TS5097 e permette a 'ts-node' di trovare il file.
-    "allowImportingTsExtensions": true,
     "plugins": [
       {
         "name": "next"
@@ -31,16 +28,13 @@
       ]
     }
   },
-  // 💡 PULIZIA: Rimuovo le duplicazioni e i percorsi obsoleti.
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts",
-    "next.config.js" // Le righe con .next\\dev/types/ e src/app/(root)/page.tsx erano ridondanti
-  ],
+    ".next/dev/types/**/*.ts"
+, "src/db/sample-data.js"  ],
   "exclude": [
     "node_modules"
   ]
