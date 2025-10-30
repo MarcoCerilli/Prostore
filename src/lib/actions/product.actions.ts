@@ -1,34 +1,49 @@
-"use server";
-import { Product } from "@/types"; // Importiamo il tipo Product
-import { LATEST_PRODUCTS_LIMIT } from "../constants";
-import { convertToPlainObject } from "../utils";
-import { prisma } from "@/db/prisma"; // O il path corretto per la tua configurazione
-import { error } from "console";
+"use server"; // Indica che questa funzione viene eseguita sul server (Next.js Server Action)
 
-//Tpizziamo la funzione per restituire Promise<Product[] | null>
+import { Product } from "@/types"; // Importiamo l'interfaccia tipizzata Product (il tipo di output atteso)
+import { LATEST_PRODUCTS_LIMIT } from "../constants"; // Probabilmente non usato, ma mantenuto
+import { convertToPlainObject } from "../utils"; // Import non usato in questo snippet
+import { prisma } from "@/db/prisma"; // Connessione al database (Prisma Client)
+import { error } from "console"; // Import non necessario (non fa nulla in questo contesto)
+
+// Tipizziamo la funzione per restituire Promise<Product[] | null>
 export async function getLatestProducts(): Promise<Product[] | null> {
   try {
-    const data = await prisma.product.findMany({
-//take: LATEST_PRODUCTS_LIMIT,
-      orderBy: { createdAt: "desc" },
+    // 1. Fetch dei dati da Prisma
+    // Prisma restituisce un array di oggetti 'Product' tipizzati come da schema,
+    // ma con 'price' e 'rating' come Decimal/stringa se non gestito esplicitamente.
+    const rawProducts = await prisma.product.findMany({
+      // take: LATEST_PRODUCTS_LIMIT, // Limitazione disattivata, ma pronta per l'uso
+      orderBy: { createdAt: "desc" }, // Ordina i risultati per data di creazione, dal più recente
     });
-    // 💡 NUOVA LOGICA: Mappa e converte i campi Decimal in stringa
-    // Usiamo 'any' nel map per accedere ai metodi Decimal di Prisma
-    const latestProducts: Product[] = data.map(item => ({
-      // Copiamo tutti i campi con lo spread
-      ...item,
-      // CONVERSIONE CRUCIALE: Decimal -> String
-      price: item.price.toString(),
-      rating: item.rating.toString(),
 
-      // Aggiungi qui anche altre conversioni se la tua interfaccia Product
-      // richiede 'id: string' (se Prisma restituisce un oggetto ID complesso)
-      // o createdAt (se vuoi una stringa ISO)
-    })) as Product[]; // Cast finale per garantire il tipo Product[]
+    // 2. Conversione e Mappatura dei dati
+    // Usiamo .map() per iterare su ogni 'rawProduct' e convertirlo nel tipo 'Product' finale.
+    const latestProducts: Product[] = rawProducts.map((rawProduct: any) => ({
+      // Manteniamo le proprietà stringa e number (stock, numReviews, isFeatured, ecc.)
+      name: rawProduct.name,
+      slug: rawProduct.slug,
+      category: rawProduct.category,
+      brand: rawProduct.brand,
+      description: rawProduct.description,
+      stock: rawProduct.stock,
+      images: rawProduct.images,
+      isFeatured: rawProduct.isFeatured,
+      banner: rawProduct.banner,
+      id: rawProduct.id as string,
+      numReviews: rawProduct.numReviews,
 
-    // Ora l'oggetto ritornato è completamente serializzabile e tipizzato
+      createdAt: rawProduct.createdAt,
+      // 💥 CORREZIONE CHIAVE: Converti 'price' e 'rating' da stringa (o Decimal) a numero.
+      price: parseFloat(rawProduct.price),
+      rating: parseFloat(rawProduct.rating),
+    }));
+
+    // 3. Ritorno serializzabile
+    // L'array 'latestProducts' è ora tipizzato correttamente (Product[]) e serializzabile.
     return latestProducts;
   } catch (error) {
+    // Gestione degli errori: registra e ritorna null in caso di fallimento del fetch.
     console.error("ERRORE PRISMA in getLatestProducts:", error);
     return null;
   }
