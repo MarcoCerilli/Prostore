@@ -1,3 +1,5 @@
+import { shippingAddress } from "@/types";
+
 export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME||'Prostore';
 export const APP_DESCRIPTION = process.env.NEXT_PUBLIC_APP_DESCRIPTION||'A MODERN ECOMMERCE STORE BUILT WITH NEXT.JS';
 export const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL||'http://localhost:3000';
@@ -14,6 +16,23 @@ export const signUpDefaultValues = {
     email:"",
     password: "",
     confirmPassword: "",
+};
+
+
+export const shippingAddressValues: shippingAddress = {
+  // prima era fullName: "",
+  firstName: "", 
+  lastName: "",
+  
+  // prima era streetAddress: "",
+  street: "", 
+  houseNumber: "",
+  
+  city: "",
+  postalCode: "",
+  country: "Italia",
+  latitude: null,
+  longitude: null,
 };
 
 /*

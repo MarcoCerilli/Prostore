@@ -59,7 +59,7 @@ const CredentialsSignUpForm = ({ callbackUrl = "/" }: CredentialsSignUpFormProps
 
   return (
     // L'attributo 'action' punta a formAction, che esegue signUpUser sul server
-    <form action={formAction} className="w-full">
+    <form action={formAction} className="w-full" noValidate>
       {/* Campo nascosto per passare l'URL di reindirizzamento alla Server Action */}
       <input type="hidden" name="callbackUrl" value={callbackUrl} />
       

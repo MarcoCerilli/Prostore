@@ -2,8 +2,12 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+// Definisci le props qui in modo che React le riconosca correttamente
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, value, ...props }, ref) => { // <-- DESTRUTTURIAMO 'value'
+
+const finalValue = (value !== undefined &&(value === null || value === "")) ? "" : value ;
+
     return (
       <input
         type={type}
@@ -12,7 +16,8 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           className
         )}
         ref={ref}
-        {...props}
+        value={finalValue} // 1. Correzione: garantisce valore non nullo/undef
+        {...props}       // 2. Correzione: Applica tutte le altre props (incluso onChange)
       />
     )
   }
