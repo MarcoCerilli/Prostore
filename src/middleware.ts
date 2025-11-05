@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { edgeAuth } from "./auth";
+import { edgeAuth } from "./lib/edge-auth";
 
 // ----------------------------------------------------
 // FUNZIONE NATIVA PER GENERARE UUID V4 (Alternativa a uuid)
