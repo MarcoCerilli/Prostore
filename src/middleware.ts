@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { v4 as uuidv4 } from 'uuid'; // Importa UUID per generare ID univoci
-// 💡 IMPORTIAMO LA FUNZIONE AUTH PER LA PROTEZIONE DELLE ROTTE
 import { auth } from "./auth"; 
+
+// ----------------------------------------------------
+// FUNZIONE NATIVA PER GENERARE UUID V4 (Alternativa a uuid)
+// Fonte: standard RFC4122/StackOverflow. Estremamente leggera.
+// ----------------------------------------------------
+function uuidv4_native() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
 // ----------------------------------------------------
 // 1. Funzione Middleware
@@ -34,7 +43,7 @@ export async function middleware(request: NextRequest) {
 
     // Se il cookie del carrello NON esiste, creane uno nuovo
     if (!sessionCartId) {
-        const newSessionCartId = uuidv4();
+        const newSessionCartId = uuidv4_native();
         
         // Se c'è un redirect o una modifica dello stato, lavoriamo sulla response
         response.cookies.set('sessionCartId', newSessionCartId, {
