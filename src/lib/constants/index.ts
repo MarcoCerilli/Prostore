@@ -20,14 +20,11 @@ export const signUpDefaultValues = {
 
 
 export const shippingAddressValues: shippingAddress = {
-  // prima era fullName: "",
   firstName: "", 
   lastName: "",
-  
-  // prima era streetAddress: "",
   street: "", 
   houseNumber: "",
-  
+  phoneNumber: "",
   city: "",
   postalCode: "",
   country: "Italia",
