@@ -1,100 +1,83 @@
-import Link from "next/link";
-import {
-  Clock,
-  Package,
-  CheckCircle,
-  XCircle,
-  ChevronRight,
-  DollarSign,
-} from "lucide-react";
-import prisma from "@/db/prisma";
-import DateFormatter from "@/components/DateFormatter"; // Assicurati che questo sia un Client Component ('use client')
-import OrderRow from "@/components/OrderRow";
-import { OrderSummary, OrderStatusProps } from "@/types/order"; // <-- NUOVA IMPORTAZIONE
-import {
-  Table,
-  TableBody,
-  TableCell, // Sostituisce <td>
-  TableHead, // Sostituisce <th>
-  TableHeader, // Sostituisce <thead>
-  TableRow,
-} from "@/components/ui/table";
+import React from 'react';
+import { getMyOrdersSummaryAction } from '@/lib/actions/user.actions';
+import { formatCurrency, formatOrderDate } from '@/lib/utils'; // Assumi queste utility
+import Link from 'next/link';
+import Image from 'next/image';
+import { Badge } from '@/components/ui/badge'; // Assumi un componente Badge
 
-const getOrders = async (): Promise<OrderSummary[]> => {
-  // ... Logica DB omessa per brevità
-  try {
-    const orders = await prisma.order.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
-      select: {
-        id: true,
-        orderNumber: true,
-        createdAt: true,
-        totalPrice: true,
-        isPaid: true,
-        isDelivered: true,
-        user: {
-          select: {
-            name: true,
-          },
-        },
-      },
-    });
-
-    // SOLUZIONE: Mappa e converti l'oggetto Decimal in number
-    const sanitizedOrders = orders.map((order) => ({
-      ...order,
-      totalPrice: order.totalPrice.toNumber(),
-    }));
-    return sanitizedOrders as unknown as OrderSummary[];
-  } catch (error) {
-    console.error("Errore nel recupero degli ordini da DB:", error);
-    return [];
-  }
+// Mappa lo stato dell'ordine ad uno stile visivo
+const getStatusBadge = (status: string) => {
+    switch (status) {
+        case 'PAID':
+            return <Badge variant="default" className="bg-green-600">Pagato</Badge>;
+        case 'PENDING_PAYMENT':
+            return <Badge variant="secondary" className="bg-yellow-500">In Attesa di Pagamento</Badge>;
+        case 'SHIPPED':
+            return <Badge variant="default" className="bg-blue-600">Spedito</Badge>;
+        case 'DELIVERED':
+            return <Badge variant="default" className="bg-emerald-600">Consegnato</Badge>;
+        case 'CANCELLED':
+            return <Badge variant="destructive">Annullato</Badge>;
+        default:
+            return <Badge variant="outline">{status}</Badge>;
+    }
 };
-// --- COMPONENTE PAGE (Server Component) ---
 
-export default async function OrdersDashboardPage() {
-  const orders = await getOrders();
 
-  return (
-    <main className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-extrabold text-center text-gray-900 mb-6 border-b pb-4">
-          📦 Riepilogo Ordini ({orders.length})     
-        </h1>
-        {orders.length === 0 ? (
-          <div className="text-center py-10 bg-white rounded-xl shadow-lg border border-gray-100">
-            <Package className="w-12 h-12 text-gray-400 mx-auto" />
-            <h3 className="mt-2 text-lg font-medium text-gray-900">
-                 Nessun Ordine Trovato    
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-                 Inizia a ricevere ordini dal tuo negozio.    
-            </p>
-          </div>
-        ) : (
-         <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-    <Table className="w-full">
-      <TableHeader className="bg-gray-50">
-        <TableRow>
-          <TableHead className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ordine ID</TableHead>
-          <TableHead className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</TableHead>
-          <TableHead className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</TableHead>
-          <TableHead className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Totale</TableHead>
-          <TableHead className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stato</TableHead>
-          <TableHead className="px-6 py-3 text-right"><span className="sr-only">Dettagli</span></TableHead>
-        </TableRow>
-      </TableHeader><TableBody> {/* <-- ATTENZIONE: Nessuna interruzione di riga/spazio qui */}
-        {orders.map((order) => (
-          <OrderRow key={order.id} order={order} />
-        ))}
-      </TableBody>
-    </Table>
-  </div>
-        )}
-      </div>
-    </main>
-  );
+export default async function OrdersPage() {
+    // ⭐ 1. Chiama la Server Action (Server-Side)
+    const orders = await getMyOrdersSummaryAction();
+
+    return (
+        <div className="space-y-8 p-4 md:p-8">
+            <h2 className="text-3xl font-bold">Storico Ordini 📦</h2>
+            <p className="text-gray-600">Visualizza e monitora i tuoi ordini recenti.</p>
+
+            {/* 2. Lista ordini */}
+            {orders.length === 0 ? (
+                <div className="text-center p-10 border rounded-lg bg-gray-50">
+                    <p className="text-lg font-medium">Non hai ancora effettuato ordini.</p>
+                    <Link href="/" className="text-blue-600 hover:underline mt-2 inline-block">
+                        Inizia lo shopping
+                    </Link>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {orders.map((order) => (
+                        <Link 
+                            key={order.orderNumber} 
+                            href={`/dashboard/orders/${order.orderNumber}`} 
+                            className="block p-4 border rounded-lg shadow-sm hover:shadow-md transition-shadow bg-white"
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-4">
+                                    {/* Immagine di anteprima */}
+                                    <Image
+                                        src={order.mainImage}
+                                        alt={`Prodotto ${order.orderNumber}`}
+                                        width={60}
+                                        height={60}
+                                        className="rounded-md object-cover"
+                                    />
+                                    <div>
+                                        <p className="font-semibold text-lg text-gray-800">Ordine #{order.orderNumber}</p>
+                                        <p className="text-sm text-gray-500">
+                                            Data: {formatOrderDate(order.createdAt)} 
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex flex-col items-end space-y-1">
+                                    {getStatusBadge(order.status)}
+                                    <p className="text-xl font-bold">
+                                        {formatCurrency(order.totalPrice)} 
+                                    </p>
+                                </div>
+                            </div>
+                        </Link>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
 }

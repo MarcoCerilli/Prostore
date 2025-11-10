@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react"; // Icona di caricamento
-import { signUpUser } from "@/lib/actions/user.action"; // L'azione corretta per la registrazione
+import { signUpUser } from "@/lib/actions/user.actions"; // L'azione corretta per la registrazione
 
 // Stato iniziale per l'hook useActionState
 const initialState = {
@@ -23,7 +23,7 @@ const initialState = {
 
 // Definisco le props che riceve dal Server Component (page.tsx)
 interface CredentialsSignUpFormProps {
-    callbackUrl?: string; // URL di reindirizzamento dopo il successo
+  callbackUrl?: string; // URL di reindirizzamento dopo il successo
 }
 
 // Componente helper per mostrare lo stato di caricamento del bottone
@@ -31,10 +31,10 @@ const SignUpButton = () => {
   const { pending } = useFormStatus();
 
   return (
-    <Button 
-      type="submit" 
-      className="w-full flex items-center justify-center" 
-      disabled={pending} 
+    <Button
+      type="submit"
+      className="w-full flex items-center justify-center"
+      disabled={pending}
       variant="default"
     >
       {pending ? (
@@ -53,7 +53,9 @@ const SignUpButton = () => {
  * Form di Registrazione Credenziali (Client Component).
  * Utilizza Server Actions per la logica di backend.
  */
-const CredentialsSignUpForm = ({ callbackUrl = "/" }: CredentialsSignUpFormProps) => {
+const CredentialsSignUpForm = ({
+  callbackUrl = "/",
+}: CredentialsSignUpFormProps) => {
   // Collega l'azione del server signUpUser con lo stato iniziale
   const [state, formAction] = useActionState(signUpUser, initialState);
 
@@ -62,9 +64,8 @@ const CredentialsSignUpForm = ({ callbackUrl = "/" }: CredentialsSignUpFormProps
     <form action={formAction} className="w-full" noValidate>
       {/* Campo nascosto per passare l'URL di reindirizzamento alla Server Action */}
       <input type="hidden" name="callbackUrl" value={callbackUrl} />
-      
+
       <div className="space-y-4">
-        
         {/* Campo Nome Completo */}
         <div>
           <Label htmlFor="name">Nome Completo</Label>
@@ -102,7 +103,7 @@ const CredentialsSignUpForm = ({ callbackUrl = "/" }: CredentialsSignUpFormProps
             autoComplete="new-password"
           />
         </div>
-        
+
         {/* Campo Conferma Password */}
         <div>
           <Label htmlFor="confirmpassword">Conferma Password</Label>
@@ -115,7 +116,7 @@ const CredentialsSignUpForm = ({ callbackUrl = "/" }: CredentialsSignUpFormProps
           />
         </div>
       </div>
-      
+
       {/* Bottone di Invio */}
       <div className="mt-6">
         <SignUpButton />
@@ -123,11 +124,13 @@ const CredentialsSignUpForm = ({ callbackUrl = "/" }: CredentialsSignUpFormProps
 
       {/* Messaggi di Stato (Errore/Successo) */}
       {state && state.message && (
-        <div className={`text-center mt-6 p-2 rounded-md text-sm ${
+        <div
+          className={`text-center mt-6 p-2 rounded-md text-sm ${
             state.success
               ? "bg-green-100 text-green-700"
               : "bg-red-100 text-red-700"
-          }`}>
+          }`}
+        >
           {state.message}
         </div>
       )}
@@ -135,10 +138,10 @@ const CredentialsSignUpForm = ({ callbackUrl = "/" }: CredentialsSignUpFormProps
       {/* Link per l'Accesso */}
       <div className="text-sm text-center text-muted-foreground mt-4">
         Hai già un account?{" "}
-        <Link 
-            href={`/sign-in${callbackUrl !== '/' ? `?callbackUrl=${callbackUrl}` : ''}`} 
-            target="_self" 
-            className="font-semibold text-indigo-600 hover:text-indigo-500"
+        <Link
+          href={`/sign-in${callbackUrl !== "/" ? `?callbackUrl=${callbackUrl}` : ""}`}
+          target="_self"
+          className="font-semibold text-indigo-600 hover:text-indigo-500"
         >
           Accedi qui
         </Link>

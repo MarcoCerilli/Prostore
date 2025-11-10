@@ -7,7 +7,7 @@ import { signInDefaultValues } from "@/lib/constants";
 import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { signInWithCredentials } from "@/lib/actions/user.action";
+import { signInWithCredentials } from "@/lib/actions/user.actions";
 import { useSearchParams } from "next/navigation";
 
 const CredentialsSignInform = () => {
@@ -64,7 +64,11 @@ const CredentialsSignInform = () => {
 
       <div className="text-sm text-center text-muted-foreground">
         Don&apos;t have an account?{" "}
-        <Link href="sign-up" target="_self" className="font-semibold text-indigo-600 hover:text-indigo-500">
+        <Link
+          href="sign-up"
+          target="_self"
+          className="font-semibold text-indigo-600 hover:text-indigo-500"
+        >
           Registrati
         </Link>
       </div>

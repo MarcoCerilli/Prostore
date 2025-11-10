@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { shippingAddress } from "@/types";
 import { shippingAddressValues } from "@/lib/constants";
-import { getUserById } from "@/lib/actions/user.action";
+import { getUserById } from "@/lib/actions/user.actions";
 import { auth } from "@/auth";
 import "server-only"; // IMPORTANTE: Forza Next.js a trattare questo come Server Component esclusivo
 
@@ -26,7 +26,6 @@ async function fetchUserAddress(
 // Questo componente gestisce solo i dati lato server (autenticazione e recupero indirizzo).
 // La logica di routing (searchParams) è delegata a CheckoutClientWrapper.
 export default async function CheckoutPage() {
-  
   // 1. Verifica Autenticazione e Ottieni userId
   const session = await auth();
   const userId = session?.user?.id;
@@ -53,9 +52,9 @@ export default async function CheckoutPage() {
 
   // 3. Renderizza il wrapper client, passandogli i dati asincroni recuperati
   return (
-    <CheckoutClientWrapper 
-      userId={userId} 
-      existingAddress={cleanedAddress as shippingAddress} 
+    <CheckoutClientWrapper
+      userId={userId}
+      existingAddress={cleanedAddress as shippingAddress}
     />
   );
 }

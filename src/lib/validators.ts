@@ -1,18 +1,12 @@
 import { PAYMENT_METHODS } from "@/types";
-import { Currency } from "lucide-react";
 import * as z from "zod";
-
-// Assumo che formatNumberWithDecimal provenga da un file utils
-// import { formatNumberWithDecimal } from "./utils"; // L'ho rimosso perché non vedo il codice di formatNumberWithDecimal
 
 // --- Schemi di Prezzo ---
 
 // Utilizza z.coerce.number() per convertire in modo sicuro la stringa da form in numero.
 export const priceSchema = z.coerce
   .number()
-  // Il prezzo deve essere maggiore di zero (validazione logica)
   .positive("Il prezzo deve essere maggiore di 0")
-  // Validazione opzionale: controlla che ci siano al massimo due decimali
   .refine((val) => {
     const parts = val.toString().split(".");
     if (parts.length === 1) return true;
@@ -37,18 +31,18 @@ export const signInFormSchema = z.object({
 });
 
 export const signUpFormSchema = z
-  .object({
-    name: z.string().min(3, "Il nome deve contenere almeno 3 caratteri"),
-    email: z.string().email("Indirizzo email non valido"),
-    password: z.string().min(6, "La password deve avere almeno 6 caratteri "),
-    confirmpassword: z
-      .string()
-      .min(6, "Conferma la password deve avere almeno 6 caratteri "),
-  })
-  .refine((data) => data.password === data.confirmpassword, {
-    message: "Le passsword non corrispondono",
-    path: ["confirmPassword"],
-  });
+  .object({
+    name: z.string().min(3, "Il nome deve contenere almeno 3 caratteri"),
+    email: z.string().email("Indirizzo email non valido"),
+    password: z.string().min(6, "La password deve avere almeno 6 caratteri "),
+    confirmpassword: z // Nome del campo: 'confirmpassword'
+      .string()
+      .min(6, "Conferma la password deve avere almeno 6 caratteri "),
+  })
+  .refine((data) => data.password === data.confirmpassword, {
+    message: "Le passsword non corrispondono",
+    path: ["confirmpassword"], 
+  });
 
 export const insertProductschema = z.object({
   name: z.string().min(3, "Il nome deve contenere almeno 3 caratteri!"),
@@ -105,10 +99,7 @@ export const shippingAddressSchema = z.object({
     stringPreprocessor,
     z.string().min(3, { message: "La nazione è richiesta." })
   ),
-  notes: z.preprocess(stringPreprocessor, z.string())
-  .nullable()
-  .optional(),
-
+  notes: z.preprocess(stringPreprocessor, z.string()).nullable().optional(),
 
   latitude: z
     .preprocess(stringPreprocessor, z.string().min(1))
@@ -119,7 +110,6 @@ export const shippingAddressSchema = z.object({
     .preprocess(stringPreprocessor, z.string().min(1))
     .nullable()
     .optional(),
-
 });
 
 /**
@@ -205,29 +195,56 @@ export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
 export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type OrderRequest = z.infer<typeof OrderSchema>;
 
+/**
+ * 1. Definizione dell'ENUM per gli Stati dell'Ordine (Riflette Prisma)
+ */
+export const OrderStatusSchema = z.enum([
+  "PENDING_PAYMENT",
+  "PAID",
+  "SHIPPED",
+  "DELIVERED",
+  "CANCELLED",
+]);
 
-//Schema for insert order
-
-export const insertOrderSchema = z.object({
-    userId: z.string().min(1, "Utente richiesto"),
-    itemsPrice: Currency,
-    shippingPrice: Currency,
-    taxPrice: Currency,
-    totalPrice: Currency,
-    paymentMethod: z.string().refine((data) => PAYMENT_METHODS.includes(data),
-    { message: "Metodo di pagamento non valido"
-}),
-
-shippingAddress: shippingAddressSchema
-})
-
-//schema for inserting order item
-
+/**
+ * 2. Schema per un singolo prodotto (OrderItem) all'interno dell'ordine,
+ * riflette i dati che saranno salvati in DB.
+ */
 export const insertOrderItemSchema = z.object({
-    productId: z.string(),
-    slug:  z.string(),
-    image:z.string(),
-    name:z.string(),
-    price:Currency,
-    qty: z.number()
-})
+  productId: z.string(),
+  slug: z.string(),
+  image: z.string(),
+  name: z.string(),
+  price: z.number().nonnegative(),
+  qty: z.number().int().positive(),
+});
+
+/**
+ * 3. Schema per l'inserimento dell'Ordine (insertOrderSchema)
+ */
+export const insertOrderSchema = z.object({
+  userId: z.string().min(1, "Utente richiesto"),
+  itemsPrice: z.number().nonnegative(),
+  shippingPrice: z.number().nonnegative(),
+  taxPrice: z.number().nonnegative(),
+  totalPrice: z.number().nonnegative(),
+
+  paymentMethod: z.string().refine((data) => PAYMENT_METHODS.includes(data), {
+    message: "Metodo di pagamento non valido",
+  }),
+
+  status: OrderStatusSchema.default("PENDING_PAYMENT"),
+
+  // Manteniamo le date per la cronologia (utili per l'admin)
+  paidAt: z.date().nullable().optional(),
+  deliveredAt: z.date().nullable().optional(),
+
+  shippingAddress: shippingAddressSchema,
+});
+
+export const paymentResultSchema = z.object({
+  id: z.string(),
+  status: z.string(),
+  email_address: z.string(),
+  price_paid: z.string(),
+});

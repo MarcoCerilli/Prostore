@@ -1,45 +1,69 @@
-// src/types/index.ts
 import z from "zod";
 import {
   insertProductschema,
   insertCartSchema,
-  cartItemSchema,
+  cartItemSchema, // Non usato direttamente, ma importante per Zod
   shippingAddressSchema,
   insertOrderItemSchema,
   insertOrderSchema,
   OrderItemSchema,
+  paymentResultSchema,
 } from "@/lib/validators";
+import { OrderItem } from "./order";
 
 // -----------------------------------------------------------
 // 1. Tipi per i prodotti e gli articoli del carrello
 // -----------------------------------------------------------
 
 export type Product = z.infer<typeof insertProductschema> & {
-  id: string; // manteniamo l Id perche nn è presente nello schema
+  id: string;
   rating: number;
   createdAt: Date;
   price: number;
 };
 
-// Tipo Articolo Carrello (già corretto basato su Zod)
-export type CartItem = z.infer<typeof cartItemSchema>;
+// ✅ TIPO 1: Backend / Database Item (usato nelle Server Actions e in Cart)
+export type BackendCartItem = {
+  productId: string; // ID prodotto (usato per il DB/Actions)
+  qty: number; // Quantità (usata per il DB/Actions)
+  price: number; // Prezzo numerico (per i calcoli del server)
+  name: string;
+  slug: string;
+  image: string;
+};
+
+// ✅ TIPO 2: Frontend Item / Output del useMemo (usato in CheckoutSummary e per PayPal)
+// Questo tipo è l'output pulito che hai creato nel useMemo.
+export type CartItemFrontend = {
+  id: string; // Mappato da productId
+  name: string;
+  price: string; // Prezzo formattato come stringa
+  quantity: number; // Mappato da qty
+  slug: string;
+  image: string;
+};
 
 // -----------------------------------------------------------
-// 2. Tipo Carrello (Correzione del conflitto)
+// 2. Tipi Carrello e Indirizzo
 // -----------------------------------------------------------
 
-// Estendiamo il tipo derivato da Zod con i campi gestiti dal database
 export type Cart = z.infer<typeof insertCartSchema> & {
-  id: string; // Aggiunto: ID generato dal DB
-  createdAt: Date; // Aggiunto: Timestamp del DB
+  id: string;
+  createdAt: Date;
   userId?: string;
   itemsPrice: number;
   totalPrice: number;
   shippingPrice: number;
-  taxPrice: number;
+  taxPrice: number; // ✅ CORREZIONE: Ora Cart contiene i BackendCartItem (attenzione alle minuscole/maiuscole)
+  items: BackendCartItem[];
 };
 
-export type shippingAddress = z.infer<typeof shippingAddressSchema>;
+// Assumiamo che shippingAddressSchema derivi da Zod e includa 'phoneNumber'
+export type shippingAddress = z.infer<typeof shippingAddressSchema> & {
+  phoneNumber: string;
+  houseNumber: string;
+  postalCode: string;
+};
 
 export const PAYMENT_METHODS = process.env.PAYMENT_METHODS
   ? process.env.PAYMENT_METHODS.split(", ")
@@ -47,35 +71,40 @@ export const PAYMENT_METHODS = process.env.PAYMENT_METHODS
 export const DEFAULT_PAYMENT_METHOD =
   process.env.DEFAULT_PAYMENT_METHOD || "Paypal";
 
+export type OrderStatus =
+  | "PENDING_PAYMENT"
+  | "PAID"
+  | "SHIPPED"
+  | "DELIVERED"
+  | "CANCELLED";
 
-  export type  OrderItem = z.infer<typeof insertOrderItemSchema>;
-    export type Order = z.infer<typeof insertOrderSchema> & {
-        id: string;
-        createdAt: Date;
-        isPaid: boolean;
-        paidAt: Date | null;
-        isDelivered: Boolean;
-        deliveredAt: Date | null;
-        orderItems: OrderItem[]
-        user: {name: string; email: string}
- }
-// Aggiungi questo tipo accanto agli altri tuoi tipi (CartItem, Cart)
+
+export type Order = z.infer<typeof insertOrderSchema> & {
+  id: string;
+  createdAt: Date;
+  paidAt: Date | null;
+  deliveredAt: Date | null;
+  status: OrderStatus;
+  orderItems: OrderItem[];
+  user: { name: string; email: string };
+};
+// Tipo payload per la Server Action (Order creation)
 export interface CheckoutPayload {
-    cartId: string; // L'ID del carrello esistente nel DB
-    userId?: string; // L'ID dell'utente (opzionale)
-    shippingAddress: { // Struttura dell'indirizzo che hai in Order.shippingAddress
-        name: string;
-        street: string;
-        city: string;
-        zip: string;
-        country: string;
-    };
-    paymentmethod: string;
-    // Non devi passare i prezzi totali se sono già nel carrello, 
-    // ma li usiamo per chiarezza
-    itemsPrice: number;
-    shippingPrice: number;
-    taxPrice: number;
-    totalPrice: number;
+  cartId: string;
+  userId?: string;
+  shippingAddress: {
+    name: string;
+    street: string;
+    houseNumber: string;
+    city: string;
+    zip: string;
+    country: string;
+  };
+  paymentmethod: string; // Dati finanziari
+  itemsPrice: number;
+  shippingPrice: number;
+  taxPrice: number;
+  totalPrice: number;
 }
 
+export type paymentResult = z.infer<typeof paymentResultSchema>;

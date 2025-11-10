@@ -1,7 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { CartItem } from "@/types";
+// ✅ Corretto: importiamo il tipo esatto che usi
+import { CartItemFrontend, BackendCartItem } from "@/types";
 import { useRouter } from "next/navigation";
 import { Plus, Minus, Trash, ShoppingCart, Loader } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -18,8 +19,8 @@ type CleanCart = {
   id: string;
   createdAt: string;
   userId: string | null;
-  sessionCartId: string;
-  items: CartItem[];
+  sessionCartId: string; // ✅ Corretto: L'array del carrello usa la tipizzazione Frontend
+  items: CartItemFrontend[];
   itemsPrice: number;
   totalPrice: number;
   shippingPrice: number;
@@ -39,41 +40,66 @@ type FallbackActionResponse =
 // Componente principale: AddToCart
 // -----------------------------------------------------------
 
-const AddToCart = ({ cart, item }: { cart?: CleanCart; item: CartItem }) => {
+// ✅ Corretto: Tipizzazione per le props
+const AddToCart = ({
+  cart,
+  item,
+}: {
+  cart?: CleanCart;
+  item: CartItemFrontend;
+}) => {
+
+    // ⭐ AGGIUNGI QUESTO BLOCCO DI VALIDAZIONE IMMEDIATA
+  if (!item.id) {
+    // Questo significa che la pagina madre non ha passato l'ID del prodotto corretto!
+    console.error("ERRORE CRITICO: Componente AddToCart non ha ricevuto item.id.");
+    // Potresti voler reindirizzare o mostrare un messaggio di errore all'utente.
+    return <div className="text-red-500 text-center">ID Prodotto mancante.</div>;
+  }
+  // FINE BLOCCO DI VALIDAZIONE
+
+
+
   const router = useRouter();
   const { toast } = useToast();
 
   const [isPending, startTransition] = useTransition();
 
-  const cartItems: CartItem[] = cart?.items || [];
-  const existItem = cartItems.find((x) => x.productId === item.productId);
-  const currentQty = existItem?.qty || 0; // Quantità PRIMA dell'azione
-
-  /**
+  const cartItems: CartItemFrontend[] = cart?.items || []; 
+  const existItem = cartItems.find((x) => x.id === item.id); 
+  const currentQty = existItem?.quantity || 0; /**
    * Gestisce l'aggiunta o la modifica della quantità.
-   * @param actionType 'add' | 'decrement' | 'delete'
-   * @param targetQty Solo per 'set', 'add', 'remove'. (Rimosso 'set' per coerenza con le azioni)
    */
+
   const handleCartAction = async (
     actionType: "add" | "decrement" | "delete",
-    targetQty?: number // Non usato in 'add'/'decrement'/'delete' ma lasciato per flessibilità
+    targetQty?: number
   ) => {
     startTransition(async () => {
       let res: FallbackActionResponse;
-      let finalQty = currentQty; // La quantità prevista dopo l'azione
+      let finalQty = currentQty;
 
       if (actionType === "add") {
-        res = await addItemToCart({ ...item, qty: 1 });
-        finalQty += 1; // Prevediamo un incremento di 1
+        // ⭐️ Mappatura cruciale: conversione da CartItemFrontend a BackendCartItem
+        const backendItem: BackendCartItem = {
+          productId: item.id, // Mappa 'id' (frontend) a 'productId' (backend)
+          name: item.name, // Presume che price sia una stringa formattata, quindi deve essere parsata
+          price: parseFloat(String(item.price).replace("€", "").replace(",", ".")),
+          qty: 1, // Aggiungiamo 1 alla volta
+          slug: item.slug,
+          image: item.image,
+        };
+        res = await addItemToCart(backendItem);
+        finalQty += 1;
       } else if (actionType === "decrement") {
-        res = await removeItemFromCart(item.productId);
-        finalQty = Math.max(0, finalQty - 1); // Prevediamo un decremento di 1 (min 0)
+        // ✅ Corretto: usa item.id come productId per la Server Action
+        res = await removeItemFromCart(item.id);
+        finalQty = Math.max(0, finalQty - 1);
       } else if (actionType === "delete") {
-        // Passiamo l'intera quantità corrente (currentQty) per forzare la rimozione totale.
-        res = await removeItemFromCart(item.productId, currentQty);
-        finalQty = 0; // Prevediamo che la quantità finale sia 0
+        // ✅ Corretto: usa item.id e la quantità corrente per la Server Action
+        res = await removeItemFromCart(item.id, currentQty);
+        finalQty = 0;
       } else {
-        // Blocco logico non raggiungibile con i tipi definiti, ma gestiamo l'errore se si dovesse estendere
         toast({
           variant: "destructive",
           description: "Azione carrello non valida.",
@@ -89,42 +115,40 @@ const AddToCart = ({ cart, item }: { cart?: CleanCart; item: CartItem }) => {
         return;
       }
 
-      // IMPORTANTE: Forziamo il refresh dopo il successo
-      router.refresh();
-
-      // -----------------------------------------------------------
-      // ✅ FIX: Logica del Toast Semplificata e più Precisa
+      router.refresh(); // -----------------------------------------------------------
+      // ✅ LOGICA TOAST UNIFORMATA (Stile Nero)
       // -----------------------------------------------------------
 
       const isInitialAdd = actionType === "add" && currentQty === 0;
       const isTotalRemoval = finalQty === 0;
 
       if (isTotalRemoval) {
-        // Si verifica se: actionType='delete', oppure actionType='decrement' e currentQty era 1
         toast({ description: `${item.name} rimosso dal carrello.` });
       } else if (isInitialAdd) {
-        // L'aggiunta iniziale ha avuto successo
-        toast({ description: `${item.name} aggiunto al carrello.` });
-      } else {
-        // Incremento/Decremento parziale
+        // Aggiunta iniziale: mostriamo il pulsante VAI AL CARRELLO
         toast({
-          description: `${item.name} aggiornato (x${finalQty})`,
+          description: `${item.name} aggiunto al carrello.`,
           action: (
-            <ToastAction
-              className="bg-gray-900 text-white hover:bg-gray-800 rounded-full font-semibold px-3 py-1"
+            <ToastAction // 🎨 Stile NERO unificato
+             className="bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg font-semibold px-3 py-1"
               altText="Vai al carrello"
               onClick={() => router.push("/cart")}
             >
-              Vai al Carrello
+                            <ShoppingCart className="h-4 w-4 mr-1" /> Vai al
+              Carrello            {" "}
             </ToastAction>
           ),
+          duration: 8000,
+        });
+      } else {
+        // Incremento/Decremento: mostriamo solo la notifica di aggiornamento
+        toast({
+          description: `${item.name} aggiornato (x${finalQty})`,
         });
       }
     });
-  };
-
-  // -----------------------------------------------------------
-  // Render
+  }; // -----------------------------------------------------------
+  // Render (resta invariato ma usa currentQty)
   // -----------------------------------------------------------
 
   // Funzione helper per mostrare il Loader o l'icona
@@ -199,7 +223,7 @@ const AddToCart = ({ cart, item }: { cart?: CleanCart; item: CartItem }) => {
   // Se l'articolo NON è nel carrello, mostra il pulsante "Aggiungi al Carrello" a larghezza intera
   return (
     <Button
-      className="w-full h-10 bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800"
+className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
       type="button"
       onClick={() => handleCartAction("add")} // Aggiungi 1 al carrello
       disabled={isPending}

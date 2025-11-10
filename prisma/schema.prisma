@@ -116,9 +116,17 @@ model Cart {
     user          User?    @relation(name: "UserCarts", fields: [userId], references: [id], onDelete: Cascade) // Usa il nuovo nome
 }
 
+enum orderStatus {
+    PENDING_PAYMENT
+    PAID
+    SHIPPED
+    DELIVERED
+    CANCELLED
+}
+
 model Order {
     id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-    orderNumber     String    @unique
+    orderNumber     String      @unique
     userId          String?     @db.Uuid
     shippingAddress Json        @db.Json
     paymentmethod   String
@@ -127,9 +135,10 @@ model Order {
     shippingPrice   Decimal     @db.Decimal(12, 2)
     taxPrice        Decimal     @db.Decimal(12, 2)
     totalPrice      Decimal     @db.Decimal(12, 2)
-    isPaid          Boolean     @default(false)
     paidAt          DateTime?   @db.Timestamp(6)
-    isDelivered     Boolean     @default(false)
+    orderStatus     String      @default("In Elaborazione") // Aggiungi questo campo
+    paypalOrderId   String?
+    status          orderStatus @default(PENDING_PAYMENT)
     deliveredAt     DateTime?   @db.Timestamp(6)
     createdAt       DateTime    @default(now()) @db.Timestamp(6)
     user            User?       @relation(name: "UserOrders", fields: [userId], references: [id], onDelete: Cascade) // Usa il nuovo nome

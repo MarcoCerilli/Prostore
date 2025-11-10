@@ -1,212 +1,228 @@
-import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { shippingAddress } from "@/types";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
-// ----------------------------------------------------
-// 1. Interfaccia Aggiornata per includere onSave
-// ----------------------------------------------------
+// Usiamo l'interfaccia completa necessaria per la UI.
+interface shippingAddress {
+  firstName: string;
+  lastName: string;
+  street: string; // Via
+  houseNumber: string; // Numero Civico (es. '12B')
+  city: string;
+  postalCode: string; // ✅ CORRETTO: Usa postalCode
+  country: string; // Nazione
+  phoneNumber: string; // Telefono
+}
+
 interface ShippingAddressFormProps {
-    address: shippingAddress;
-    // La callback che prende il nuovo indirizzo e lo salva/reindirizza nel componente padre
-    onSave: (newAddress: shippingAddress) => void;
+  address: shippingAddress;
+  onSave: (address: shippingAddress) => void;
 }
 
-// ----------------------------------------------------
-// 2. Componente ShippingAddressForm
-// ----------------------------------------------------
-const ShippingAddressForm = ({ address, onSave }: ShippingAddressFormProps) => {
-    
-    // NOTA: Ho rinominato 'street' in 'streetAddress' e 'postalCode' in 'zipCode'
-    // per coerenza con il tipo shippingAddress definito altrove.
-    const [formData, setFormData] = useState<shippingAddress>(address);
-    const [isSaving, setIsSaving] = useState(false);
-    const { toast } = useToast();
+const ShippingAddressForm: React.FC<ShippingAddressFormProps> = ({
+  address,
+  onSave,
+}) => {
+  // Inizializziamo lo stato con l'indirizzo esistente passato come prop
+  const [addressDetails, setAddressDetails] =
+    useState<shippingAddress>(address);
+  const [isAttemptedSubmit, setIsAttemptedSubmit] = useState(false);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value,
-        });
-    };
-
-    const handleSaveAddress = async (e: React.FormEvent) => {
-        e.preventDefault();
-        
-        // Validazione minima
-        if (!formData.firstName || !formData.lastName || !formData.street || !formData.postalCode) {
-            return toast({
-                title: "Campi Mancanti",
-                description: "Per favore, compila tutti i campi obbligatori.",
-                variant: "destructive",
-            });
-        }
-
-        setIsSaving(true);
-        console.log("Simulazione salvataggio indirizzo su database/server...");
-        
-        // Simula la chiamata API/Server Action
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // 1. CHIAMA LA FUNZIONE PASSTA DAL GENITORE
-        onSave(formData);
-        
-        setIsSaving(false);
-        
-        toast({
-            title: "Indirizzo Salvato!",
-            description: "Procedi al metodo di pagamento.",
-            // Uso di "default" per evitare l'errore di tipizzazione
-            variant: "default", 
-        });
-        
-        // NOTA: Il reindirizzamento al passo 'payment' è ora gestito all'interno di onSave in CheckoutClientWrapper.
-    };
-
+  // Funzione per validare se tutti i campi sono non vuoti
+  const isFormComplete = () => {
+    // NOTA: Controlliamo solo i campi che usiamo nel form.
+    // L'uso di Object.values(addressDetails) è sconsigliato se il tipo può avere campi opzionali o non mappati.
+    // Li elenchiamo esplicitamente per sicurezza
     return (
-        <div className="space-y-6">
-            <h2 className="text-2xl font-bold tracking-tight border-b pb-2">1. Dettagli di Spedizione</h2>
-            
-            <Card className="shadow-lg">
-                <CardHeader>
-                    <CardTitle className="text-xl">Informazioni di Contatto e Indirizzo</CardTitle>
-                    <CardDescription>Inserisci l'indirizzo a cui spediremo il tuo ordine.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSaveAddress} className="space-y-6">
-                        
-                        {/* Nome e Cognome */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="firstName">Nome</Label>
-                                <Input 
-                                    id="firstName" 
-                                    name="firstName"
-                                    type="text" 
-                                    value={formData.firstName} 
-                                    onChange={handleChange} 
-                                    required 
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="lastName">Cognome</Label>
-                                <Input 
-                                    id="lastName" 
-                                    name="lastName"
-                                    type="text" 
-                                    value={formData.lastName} 
-                                    onChange={handleChange} 
-                                    required 
-                                />
-                            </div>
-                        </div>
-
-                        {/* Indirizzo e Numero Civico */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="space-y-2 col-span-3">
-                                <Label htmlFor="streetAddress">Via/Piazza</Label>
-                                <Input 
-                                    id="streetAddress" 
-                                    name="streetAddress"
-                                    type="text" 
-                                    value={formData.street} 
-                                    onChange={handleChange} 
-                                    required 
-                                />
-                            </div>
-                            <div className="space-y-2 col-span-1">
-                                <Label htmlFor="houseNumber">N° Civico</Label>
-                                <Input 
-                                    id="houseNumber" 
-                                    name="houseNumber"
-                                    type="text" 
-                                    value={formData.houseNumber} 
-                                    onChange={handleChange} 
-                                />
-                            </div>
-                        </div>
-                        
-                        {/* Città, CAP e Nazione */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="city">Città</Label>
-                                <Input 
-                                    id="city" 
-                                    name="city"
-                                    type="text" 
-                                    value={formData.city} 
-                                    onChange={handleChange} 
-                                    required 
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="zipCode">CAP</Label>
-                                <Input 
-                                    id="zipCode" 
-                                    name="zipCode"
-                                    type="text" 
-                                    value={formData.postalCode} 
-                                    onChange={handleChange} 
-                                    required 
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="country">Nazione</Label>
-                                <Input 
-                                    id="country" 
-                                    name="country"
-                                    type="text" 
-                                    value={formData.country} 
-                                    onChange={handleChange} 
-                                    required 
-                                />
-                            </div>
-                        </div>
-
-                        {/* Telefono */}
-                         <div className="space-y-2">
-                            <Label htmlFor="phoneNumber">Numero di Telefono</Label>
-                            <Input 
-                                id="phoneNumber" 
-                                name="phoneNumber"
-                                type="tel" 
-                                value={formData.houseNumber} 
-                                onChange={handleChange} 
-                                required 
-                            />
-                        </div>
-
-                        {/* Note (Facoltativo) */}
-                        <div className="space-y-2">
-                            <Label htmlFor="notes">Note (es. orari di consegna, citofono)</Label>
-                            <Textarea 
-                                id="notes" 
-                                name="notes" 
-                                value={formData.notes || ''} 
-                                onChange={handleChange} 
-                                rows={3} 
-                            />
-                        </div>
-
-                        {/* Pulsante Salva */}
-                        <div className="pt-4 border-t">
-                            <Button
-                                type="submit"
-                                disabled={isSaving}
-                                className="w-full h-12 text-lg bg-indigo-600 hover:bg-indigo-700 transition"
-                            >
-                                {isSaving ? "Salvataggio..." : "Salva e Continua"}
-                            </Button>
-                        </div>
-                    </form>
-                </CardContent>
-            </Card>
-        </div>
+      addressDetails.firstName.trim() !== "" &&
+      addressDetails.lastName.trim() !== "" &&
+      addressDetails.street.trim() !== "" &&
+      addressDetails.houseNumber.trim() !== "" &&
+      addressDetails.city.trim() !== "" &&
+      addressDetails.postalCode.trim() !== "" && // ✅ Usa postalCode
+      addressDetails.country.trim() !== "" &&
+      addressDetails.phoneNumber.trim() !== ""
     );
-}
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAddressDetails({
+      ...addressDetails,
+      [e.target.id]: e.target.value,
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsAttemptedSubmit(true);
+
+    if (isFormComplete()) {
+      // Chiamiamo onSave con i dati completi raccolti dal form
+      onSave(addressDetails);
+    }
+  };
+
+  return (
+    <Card className="md:col-span-2 shadow-lg">
+      <CardHeader>
+        <CardTitle>Indirizzo di Spedizione</CardTitle>
+        <CardDescription>
+          Inserisci dove desideri ricevere i tuoi prodotti e un recapito
+          telefonico.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Riga 1: Nome e Cognome */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">Nome</Label>
+              <Input
+                id="firstName"
+                value={addressDetails.firstName}
+                onChange={handleChange}
+                required
+                className={
+                  isAttemptedSubmit && !addressDetails.firstName
+                    ? "border-red-500"
+                    : ""
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Cognome</Label>
+              <Input
+                id="lastName"
+                value={addressDetails.lastName}
+                onChange={handleChange}
+                required
+                className={
+                  isAttemptedSubmit && !addressDetails.lastName
+                    ? "border-red-500"
+                    : ""
+                }
+              />
+            </div>
+          </div>
+
+          {/* Riga 2: Via e Numero Civico */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="street">Via</Label>
+              <Input
+                id="street"
+                value={addressDetails.street}
+                onChange={handleChange}
+                required
+                className={
+                  isAttemptedSubmit && !addressDetails.street
+                    ? "border-red-500"
+                    : ""
+                }
+              />
+            </div>
+            <div className="space-y-2 col-span-1">
+              <Label htmlFor="houseNumber">N. Civico</Label>
+              <Input
+                id="houseNumber"
+                value={addressDetails.houseNumber}
+                onChange={handleChange}
+                required
+                className={
+                  isAttemptedSubmit && !addressDetails.houseNumber
+                    ? "border-red-500"
+                    : ""
+                }
+              />
+            </div>
+          </div>
+
+          {/* Riga 3: Città e CAP (postalCode) */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="city">Città</Label>
+              <Input
+                id="city"
+                value={addressDetails.city}
+                onChange={handleChange}
+                required
+                className={
+                  isAttemptedSubmit && !addressDetails.city
+                    ? "border-red-500"
+                    : ""
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="postalCode">CAP</Label>
+              <Input
+                id="postalCode"
+                value={addressDetails.postalCode} // ✅ CORRETTO: Binding a postalCode
+                onChange={handleChange}
+                required
+                maxLength={5}
+                className={
+                  isAttemptedSubmit && !addressDetails.postalCode
+                    ? "border-red-500"
+                    : ""
+                }
+              />
+            </div>
+          </div>
+
+          {/* Riga 4: Nazione e Telefono */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="country">Nazione</Label>
+              <Input
+                id="country"
+                value={addressDetails.country}
+                onChange={handleChange}
+                required
+                className={
+                  isAttemptedSubmit && !addressDetails.country
+                    ? "border-red-500"
+                    : ""
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber">Telefono</Label>
+              <Input
+                id="phoneNumber"
+                value={addressDetails.phoneNumber}
+                onChange={handleChange}
+                required
+                type="tel"
+                className={
+                  isAttemptedSubmit && !addressDetails.phoneNumber
+                    ? "border-red-500"
+                    : ""
+                }
+              />
+            </div>
+          </div>
+
+          <Button
+            type="submit"
+            // ✅ CLASSI AGGIORNATE: bg-indigo-600 per coerenza
+            className="w-full text-lg h-12 bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-lg font-semibold"
+            disabled={!isFormComplete()}
+          >
+            Conferma e Continua al Pagamento
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+};
 
 export default ShippingAddressForm;

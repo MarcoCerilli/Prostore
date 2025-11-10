@@ -4,40 +4,40 @@ import "@/assets/styles/globals.css";
 import { APP_NAME, SERVER_URL } from "@/lib/constants/index";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
-import "@/lib/zod-i18n"
+import "@/lib/zod-i18n";
+import { AuthSessionProvider } from "@/components/auth/AuthSessionProvider";
 
-
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-    title: {
-        template: `%s | Prostore`,
-        default: APP_NAME           //Possiamo impostare il totolo su un oggetto e usare un modello 
-    },
-    description: "APP_DESCRIPTION",
-    metadataBase: new URL(SERVER_URL)
+  title: {
+    template: `%s | Prostore`,
+    default: APP_NAME, //Possiamo impostare il totolo su un oggetto e usare un modello
+  },
+  description: "APP_DESCRIPTION",
+  metadataBase: new URL(SERVER_URL),
 };
 
 export default function RootLayout({
-    children,
+  children,
 }: Readonly<{
-    children: React.ReactNode;
+  children: React.ReactNode;
 }>) {
-    return (
-        <html lang="en" suppressHydrationWarning>
-            <body
-                className={`${inter.className} antialiased`}>
-                    <ThemeProvider
-                    attribute="class"
-                    defaultTheme="light"
-                    enableSystem
-                    disableTransitionOnChange
-                    
-                    >
-                {children}
-                <Toaster/>                
-                </ThemeProvider>
-            </body>
-        </html>
-    );
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.className} antialiased`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthSessionProvider>
+            {children}
+            <Toaster />
+          </AuthSessionProvider>
+        </ThemeProvider>
+      </body>
+    </html>
+  );
 }

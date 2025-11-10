@@ -7,7 +7,7 @@ import { Cart as PrismaCartModel } from "@prisma/client"; // Alias per il tipo C
 import { unstable_noStore } from "next/cache";
 
 // Importiamo il tipo front-end (con i prezzi come 'number')
-import { Cart, CartItem } from "@/types"; 
+import { Cart, BackendCartItem } from "@/types"; 
 // NOTA: Assumiamo che il tuo file "@/types" contenga l'interfaccia Cart
 // che definisce i campi price come number.
 
@@ -15,7 +15,7 @@ import { Cart, CartItem } from "@/types";
 // e per preparare i campi Decimali alla conversione.
 export interface CartWithDecimalItems extends PrismaCartModel { 
     // I campi Price sono ancora Decimal qui.
-    items: CartItem[]; // Lo array items è il tipo corretto del frontend
+    items: BackendCartItem[]; // Lo array items è il tipo corretto del frontend
 }
 
 /**
