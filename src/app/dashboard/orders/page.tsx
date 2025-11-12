@@ -4,6 +4,9 @@ import { formatCurrency, formatOrderDate } from '@/lib/utils'; // Assumi queste 
 import Link from 'next/link';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge'; // Assumi un componente Badge
+import { Button } from '@/components/ui/button';
+import { Home } from 'lucide-react';
+import { BackButton } from '@/components/ui/shared/BackButton';
 
 // Mappa lo stato dell'ordine ad uno stile visivo
 const getStatusBadge = (status: string) => {
@@ -30,8 +33,21 @@ export default async function OrdersPage() {
 
     return (
         <div className="space-y-8 p-4 md:p-8">
-            <h2 className="text-3xl font-bold">Storico Ordini 📦</h2>
-            <p className="text-gray-600">Visualizza e monitora i tuoi ordini recenti.</p>
+              {/* 1. Intestazione e Link */}
+                <div className="mb-8 flex justify-between items-center border-b pb-4">
+                    {/* BackButton dovrebbe portare alla pagina /dashboard/profile */}
+                    <BackButton /> 
+                    <Button asChild variant="link" className="text-sm text-gray-600 hover:text-indigo-600 p-0 h-auto">
+                        <Link href="/">
+                            <span className="flex items-center gap-2"> 
+                                Home 
+                                <Home className="h-4 w-4" /> 
+                            </span>
+                        </Link>
+                    </Button>
+                </div>
+            <h2 className="text-3xl font-bold text-center">Storico Ordini 📦</h2>
+            <p className="text-gray-600 text-center">Visualizza e monitora i tuoi ordini recenti.</p>
 
             {/* 2. Lista ordini */}
             {orders.length === 0 ? (
@@ -60,7 +76,7 @@ export default async function OrdersPage() {
                                         className="rounded-md object-cover"
                                     />
                                     <div>
-                                        <p className="font-semibold text-lg text-gray-800">Ordine #{order.orderNumber}</p>
+                                        <p className="font-semibold text-lg text-gray-800">Ordine {order.orderNumber}</p>
                                         <p className="text-sm text-gray-500">
                                             Data: {formatOrderDate(order.createdAt)} 
                                         </p>

@@ -92,9 +92,9 @@ interface OrderDetailsPageProps {
 export default async function OrderDetailsPage({
   params,
 }: OrderDetailsPageProps) {
-  // Risoluzione definitiva del conflitto Next.js/TypeScript
-  const resolvedParams = await (params as any);
-  const { orderId } = resolvedParams;
+
+  // estraiamo l'ID in modo esplicito
+  const { orderId } = params;
 
   // Utilizziamo orderId per chiamare la Server Action
   const order = (await getOrderDetailsAction(orderId)) as OrderDetails | null;

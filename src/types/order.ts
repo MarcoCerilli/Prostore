@@ -2,6 +2,8 @@
 
 // Usiamo gli import per la definizione Zod solo per i tipi.
 import { insertOrderItemSchema } from "@/lib/validators";
+import { orderStatus } from "@prisma/client";
+import { revalidatePath } from "next/cache";
 import z from "zod";
 
 // --- Tipi di Base ---
@@ -20,20 +22,29 @@ export type OrderItem = z.infer<typeof insertOrderItemSchema> & {
 
 // 2. TIPO PER IL RIEPILOGO DEGLI ORDINI (LISTA)
 export type OrderSummary = {
-  orderStatus: any;
+  status: orderStatus;
   id: string;
-  orderNumber: string;
+  orderNumber: string | null;
   createdAt: Date;
   totalPrice: number; // Viene convertito da Decimal a number
-  status: string;
-  // Usa Pick sull'OrderItem appena definito per il riepilogo
   orderItems: Pick<OrderItem, "id" | "name">[] 
   user: {
     name: string | null;
   } | null;
 };
 
-// 3. TIPO PER IL DETTAGLIO ORDINE (CONTENENTE TUTTI I CAMPI)
+// --- 3. TIPO COMPLETO PER ADMIN (getAllOrdersSummaryAction) ---
+// Estende OrderSummary e aggiunge i campi specifici per la vista admin (user completo, payment method, ecc.)
+export interface FullOrderSummary extends OrderSummary {
+    user: {
+        id: string;
+        name: string | null;
+        email: string | null;
+    } | null;
+    paymentMethod: string;
+    // totalAmount e status sono ereditati da OrderSummary
+}
+// 4. TIPO PER IL DETTAGLIO ORDINE (CONTENENTE TUTTI I CAMPI)
 export type OrderWithItems = {
   id: string;
   orderNumber: string;
@@ -50,5 +61,3 @@ export type OrderWithItems = {
   orderItems: OrderItem[]; 
 }
 
-// Nota: Dovresti aggiungere qui anche il tipo `OrderStatus` se non è già altrove.
-// export type OrderStatus = "PENDING_PAYMENT" | "PAID" | ...;

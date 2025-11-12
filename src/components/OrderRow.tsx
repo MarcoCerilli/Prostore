@@ -12,6 +12,9 @@ import DateFormatter from "./DateFormatter";
 import { OrderSummary } from "@/types/order";
 import { TableCell, TableRow } from "./ui/table";
 
+
+
+
 // --- Tipi per le Props ---
 interface OrderRowProps {
   order: OrderSummary;
@@ -68,10 +71,7 @@ export default function OrderRow({ order, isUserView }: OrderRowProps) {
   const currentStatus = getStatus(order);
 
   // Imposta il percorso del link
-  const linkPath = isUserView
-    ? `/dashboard/profile/orders/${order.id}`
-    : `/dashboard/orders/${order.id}`;
-
+  const linkPath =`/dashboard/orders/${order.id}`;
   return (
     <TableRow key={order.id} className="hover:bg-gray-50">
       <TableCell className="px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-600">
@@ -100,7 +100,7 @@ export default function OrderRow({ order, isUserView }: OrderRowProps) {
       {/* Colonna Dettagli */}
       <TableCell className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
         <Link
-          href={linkPath}
+         href={`/dashboard/orders/${order.id}`} // <--- QUESTA È LA PARTE CRITICA
           className="text-indigo-600 hover:text-indigo-900 flex items-center justify-center " // Manca justify-center qui
         >
           Dettagli

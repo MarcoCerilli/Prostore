@@ -70,7 +70,7 @@ const TableHead = React.forwardRef<
   HTMLTableCellElement,
   React.ThHTMLAttributes<HTMLTableCellElement>
 >(({ className, ...props }, ref) => (
-  <th
+<th
     ref={ref}
     className={cn(
       // Rimuoviamo h-10 e usiamo padding verticale più generoso (py-3)
@@ -86,7 +86,7 @@ const TableCell = React.forwardRef<
   HTMLTableCellElement,
   React.TdHTMLAttributes<HTMLTableCellElement>
 >(({ className, ...props }, ref) => (
-  <td
+<td
     ref={ref}
     className={cn(
       // Aumentiamo il padding verticale a py-4 e orizzontale a px-6

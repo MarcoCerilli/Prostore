@@ -333,6 +333,7 @@ export async function createOrderAction(
     // ... (Revalidate paths e return di successo)
     revalidatePath("/");
     revalidatePath("/dashboard/orders");
+    revalidatePath("/admin/orders"); // 
     revalidatePath(`/dashboard/orders/${transactionResult.orderNumber}`);
 
     return {

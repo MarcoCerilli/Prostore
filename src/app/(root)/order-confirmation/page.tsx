@@ -91,7 +91,7 @@ export default async function OrderConfirmationPage({
             Ordine Eseguito con Successo!
           </h1>
           <p className="text-gray-600 mt-2 text-lg">
-            Grazie per il tuo acquisto. Il tuo ordine **#{order.orderNumber}** è
+            Grazie per il tuo acquisto. Il tuo ordine {order.orderNumber} è
             stato confermato e i dettagli sono qui sotto.
           </p>
         </div>

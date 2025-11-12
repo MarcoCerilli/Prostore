@@ -86,7 +86,7 @@ export default async function OrderDetailPage({
   return (
     <div className="container mx-auto p-4 md:p-8 min-h-screen">
       <h1 className="text-3xl font-bold mb-6">
-        Dettagli Ordine #{order.orderNumber}
+        Dettagli Ordine {order.orderNumber}
       </h1>
 
       <div className="grid md:grid-cols-3 gap-8">

@@ -385,7 +385,7 @@ export async function getOrderDetailsAction(orderId: string) {
   try {
     const order = await prisma.order.findFirst({
       where: {
-        orderNumber: orderId,
+        id: orderId,
         userId: userId, // CRUCIALE: Filtra per l'utente corrente
       },
       include: {

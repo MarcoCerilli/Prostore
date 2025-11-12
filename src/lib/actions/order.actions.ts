@@ -55,11 +55,9 @@ export async function getMyOrdersSummaryAction(): Promise<OrderSummary[]> {
       id: order.id,
       orderNumber: order.orderNumber,
       createdAt: order.createdAt,
-      // CRITICO: Converti il Decimal di Prisma in number
       totalPrice: order.totalPrice.toNumber(),
-      // Mappiamo lo stato
       orderStatus: order.status as orderStatus,
-      status: order.status as string,
+      status: order.status as orderStatus,
 
       user: order.user,
       orderItems: order.OrderItem.map((item) => ({
@@ -74,3 +72,4 @@ export async function getMyOrdersSummaryAction(): Promise<OrderSummary[]> {
     return [];
   }
 }
+

@@ -30,7 +30,7 @@ export default async function MyOrdersPage() {
                     <BackButton /> 
                     <Button asChild variant="link" className="text-sm text-gray-600 hover:text-indigo-600 p-0 h-auto">
                         <Link href="/">
-                            <span className="flex items-center gap-2"> 
+                            <span className="flex items-center gap-2 mr-6"> 
                                 Home 
                                 <Home className="h-4 w-4" /> 
                             </span>

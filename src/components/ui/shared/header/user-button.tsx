@@ -1,30 +1,41 @@
+// 📁 components/ui/shared/header/user-button.tsx
+"use client"; // ⭐ ADESSO È UN CLIENT COMPONENT
+
 import Link from "next/link";
-import { auth } from "@/auth";
-import { signOutUser } from "@/lib/actions/user.actions";
+// Importiamo useSession e signOut direttamente per i Client Component
+import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserIcon } from "lucide-react";
+// ⭐ Importato ListOrdered per il link Admin
+import { UserIcon, LogOut, Package, ListOrdered } from "lucide-react";
 
-const UserButton = async () => {
-  const session = await auth();
+const UserButton = () => {
+  // ⭐ 1. Legge lo stato e i dati dell'utente tramite hook
+  const { data: session, status } = useSession();
+  const isAuthenticated = status === "authenticated";
 
-  if (!session) {
+  // 2. Se NON autenticato, mostra il link Sign In
+  if (!isAuthenticated) {
     return (
       <Button asChild>
         <Link href="/sign-in">
-          <UserIcon />
-          Sign In
+          <UserIcon className="w-5 h-5 mr-2" />
+          Accedi
         </Link>
       </Button>
     );
   }
 
+  const isAdmin = session.user?.role?.toUpperCase() === "ADMIN";
+
+  // 3. Se AUTENTICATO, mostra il dropdown
   const firstInitial = session.user?.name?.charAt(0).toUpperCase() ?? "U";
 
   return (
@@ -41,6 +52,7 @@ const UserButton = async () => {
           </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56" align="end" forceMount>
+          {/* Informazioni Utente (include il Ruolo per debug/verifica) */}
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
               <div className="text-sm font-medium leading-none">
@@ -49,17 +61,43 @@ const UserButton = async () => {
               <div className="text-sm text-muted-foreground leading-none">
                 {session.user?.email}
               </div>
+              {/* ⭐ DEBUG: MOSTRA IL RUOLO LETTO DAL CLIENT */}
+              <div
+                className={`text-xs leading-none ${isAdmin ? "text-red-500 font-semibold" : "text-blue-500"}`}
+              >
+                Ruolo: {session.user?.role || "Non Definito"}
+              </div>
             </div>
           </DropdownMenuLabel>
-          <DropdownMenuItem className="p-0 mb-1">
-            <form action={signOutUser} className="w-full">
-              <Button
-                className="w-full py-4 px-2 h-4 justify-start"
-                variant="ghost"
-              >
-                Sign Out
-              </Button>
-            </form>
+
+          <DropdownMenuSeparator />
+
+          {/* ⭐ NUOVO: Link all'Area Admin, visibile solo se isAdmin è true */}
+          {isAdmin && (
+            <DropdownMenuItem asChild>
+              <Link href="/admin/orders" className="flex items-center w-full">
+                <ListOrdered className="w-4 h-4 mr-2" />
+                Area Admin
+              </Link>
+            </DropdownMenuItem>
+          )}
+
+          {/* Link alla Dashboard Ordini standard (per tutti) */}
+          <DropdownMenuItem asChild>
+            <Link href="/dashboard/orders" className="flex items-center w-full">
+              <Package className="w-4 h-4 mr-2" />I Miei Ordini
+            </Link>
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+
+          {/* Funzione di Logout Diretta */}
+          <DropdownMenuItem
+            className="text-red-500 focus:text-red-600 cursor-pointer"
+            onClick={() => signOut({ callbackUrl: "/" })}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Esci
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
