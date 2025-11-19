@@ -2,6 +2,13 @@ import ProductCard from "./product-card";
 import { Product } from "@/types";
 
 
+
+interface ProductListProps {
+    data: Product[]; // Array di prodotti
+    title: string;
+}
+
+
 const ProductList = ({ data, title, limit }: { data: Product[]; title?: string; limit?: number }) => {
 
     const limitedData = limit ? data.slice(0,limit) : data;

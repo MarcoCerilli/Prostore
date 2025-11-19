@@ -24,19 +24,24 @@ type FormFieldContextValue<
   name: TName
 }
 
+
 const FormFieldContext = React.createContext<FormFieldContextValue | null>(null)
 
 const FormField = <
-  TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TFieldValues extends FieldValues, // Rimuovi `= FieldValues`
+  TName extends FieldPath<TFieldValues>
 >({
-  ...props
+  ...props
 }: ControllerProps<TFieldValues, TName>) => {
-  return (
-    <FormFieldContext.Provider value={{ name: props.name }}>
-      <Controller {...props} />
-    </FormFieldContext.Provider>
-  )
+  // ⭐️ Utilizziamo il contesto del form per dedurre il controllo tipizzato
+  const { control } = useFormContext<TFieldValues>(); 
+
+  return (
+    <FormFieldContext.Provider value={{ name: props.name }}>
+      {/* ⭐️ Passiamo il controllo tipizzato dedotto dal contesto */}
+      <Controller control={control} {...props} /> 
+    </FormFieldContext.Provider>
+  )
 }
 
 const useFormField = () => {

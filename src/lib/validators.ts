@@ -1,5 +1,6 @@
 import { PAYMENT_METHODS } from "@/types";
 import * as z from "zod";
+import { updateUserProfile } from "./actions/user.actions";
 
 // --- Schemi di Prezzo ---
 
@@ -26,23 +27,38 @@ const stringPreprocessor = (val: any) =>
 // --- Schemi di Form (Login, Registrazione, Prodotto) ---
 
 export const signInFormSchema = z.object({
-  email: z.string().email("Indirizzo email non valido"),
-  password: z.string().min(6, "La password deve avere almeno 6 caratteri "),
+  email: z.preprocess(
+    stringPreprocessor,
+    z.string().email("Indirizzo email non valido")
+  ),
+  password: z.preprocess(
+    stringPreprocessor,
+    z.string().min(6, "La password deve avere almeno 6 caratteri ")
+  ),
 });
 
 export const signUpFormSchema = z
-  .object({
-    name: z.string().min(3, "Il nome deve contenere almeno 3 caratteri"),
-    email: z.string().email("Indirizzo email non valido"),
-    password: z.string().min(6, "La password deve avere almeno 6 caratteri "),
-    confirmpassword: z // Nome del campo: 'confirmpassword'
-      .string()
-      .min(6, "Conferma la password deve avere almeno 6 caratteri "),
-  })
-  .refine((data) => data.password === data.confirmpassword, {
-    message: "Le passsword non corrispondono",
-    path: ["confirmpassword"], 
-  });
+  .object({
+    name: z.preprocess(
+      stringPreprocessor,
+      z.string().min(3, "Il nome deve contenere almeno 3 caratteri")
+    ),
+    email: z.preprocess(
+      stringPreprocessor,
+      z.string().email("Indirizzo email non valido")
+    ),
+    password: z.preprocess(
+      stringPreprocessor,
+      z.string().min(6, "La password deve avere almeno 6 caratteri ")
+    ),
+    confirmpassword: z // Nome del campo: 'confirmpassword'
+      .string()
+      .min(6, "Conferma la password deve avere almeno 6 caratteri "),
+  })
+  .refine((data) => data.password === data.confirmpassword, {
+    message: "Le passsword non corrispondono",
+    path: ["confirmpassword"],
+  });
 
 export const insertProductschema = z.object({
   name: z.string().min(3, "Il nome deve contenere almeno 3 caratteri!"),
@@ -59,8 +75,18 @@ export const insertProductschema = z.object({
     .array(z.string())
     .min(1, "Il prodotto deve avere almeno un'immagine"),
   isFeatured: z.boolean(),
-  banner: z.string().nullable(),
+  banner: z
+    .preprocess(
+      (val) => (val === "" ? null : val), //Trasfoma la stringa vuota in null
+      z.string().url("URL banner non valido").nullable()
+    )
+    .optional(),
   price: priceSchema,
+});
+
+//SCHEMA PER AGGIORNARE I PRODOTTI
+export const updateProductSchema = insertProductschema.extend({
+  id: z.string().min(1, "Id è richiesto"),
 });
 
 // --- Schemi di Checkout e Carrello ---
@@ -247,4 +273,34 @@ export const paymentResultSchema = z.object({
   status: z.string(),
   email_address: z.string(),
   price_paid: z.string(),
+});
+
+// Nel tuo file validators.ts
+
+export const updateUserProfileSchema = z.object({
+  
+ name: z.string()
+    .min(3, "Il nome deve contenere almeno 3 caratteri")
+    .trim()
+    .optional() // L'input può essere undefined (da RHF o dal DB)
+    .transform(e => e ?? ""), // Se undefined o null, diventa "" (garantendo il tipo string)
+    
+  // 2. CAMPO EMAIL
+  email: z.string()
+    .email("Indirizzo email non valido")
+    .trim()
+    .optional()
+    .transform(e => e ?? ""),
+    
+  // 3. PASSWORD (la sua logica è già corretta e non va toccata)
+  password: z.string()
+    .min(6, "La password deve avere almeno 6 caratteri ")
+    .optional()
+    .or(z.literal("")),
+});
+
+// Schema per aggiornare utenti (QUESTO NON DEVE CAMBIARE)
+export const updateUserSchema = updateUserProfileSchema.extend({
+  id: z.string().min(1, "Id è richiesto"),
+  role: z.string().min(1, "Il ruolo è richiesto"),
 });

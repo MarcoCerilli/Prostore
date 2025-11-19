@@ -13,10 +13,27 @@ import { hashSync, compare } from "bcrypt-ts-edge";
 import prisma from "@/db/prisma";
 import { formatError } from "../utils";
 import { auth } from "@/auth";
-import { z } from "zod";
+import { success, z } from "zod";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { convertToPlainObject } from "../utils";
+import { updateUserSchema } from "../validators"; // Importa il tuo schema appena definito
+
+type UserBaseUpdatePayload = z.infer<typeof updateUserSchema>;
+
+//definiamo la costante PAGE_SIZE
+const PAGE_SIZE = 6;
+
+// Assumiamo un tipo base per l'utente, basato sullo schema Prisma
+type User = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  role: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 // Definizione dei tipi locali (se non importati da "@/types")
 type BackendCartItem = {
@@ -40,9 +57,102 @@ type ActionResponse = {
   message: string;
 };
 
-// --- DEFINIZIONE TIPI PER IL PROFILO ---
-interface UserProfileUpdatePayload
-  extends z.infer<typeof shippingAddressSchema> {}
+// ----------------------------------------------------------------------
+// --- DEFINIZIONE TIPI PER IL PROFILO (CORRETTO) ---
+// ----------------------------------------------------------------------
+// ----------------------------------------------------------------------
+// 💡 FUNZIONE AGGIUNTA: Aggiornamento Dati Base Utente (Nome, Email, Ruolo, Password)
+// ----------------------------------------------------------------------
+
+/**
+ * Aggiorna i dati base dell'utente (nome, email, ruolo, password).
+ * Questo risolve il problema di tipizzazione nel form di amministrazione/profilo.
+ */
+export async function updateUserBaseData(
+  payload: UserBaseUpdatePayload
+): Promise<ActionResponse> {
+  // Assicurati che 'hashSync' sia importato (è presente in cima al tuo file)
+
+  // 1. Validazione Zod
+  const validationResult = updateUserSchema.safeParse(payload);
+
+  if (!validationResult.success) {
+    const errorMsg = validationResult.error.issues
+      .map((issue) => `${String(issue.path[0])}: ${issue.message}`)
+      .join("; ");
+    return { success: false, message: `Errore di validazione: ${errorMsg}` };
+  }
+
+  // Estraiamo i campi, separando id e password (che richiede hashing)
+  const { id, password, ...dataToUpdate } = validationResult.data;
+
+  // 2. Preparazione dei dati per il DB
+  const updateData: Prisma.UserUpdateInput = {
+    ...dataToUpdate,
+    // Il campo email è nullo nel tuo tipo User, ma nel form Zod è stringa non nulla.
+    // Assicuriamoci che i dati siano puliti
+    email: dataToUpdate.email,
+    name: dataToUpdate.name,
+    role: dataToUpdate.role,
+  };
+
+  if (password && password.length >= 6) {
+    // Solo se una nuova password è stata fornita e valida
+    updateData.password = hashSync(password, 10);
+  }
+
+  try {
+    // 3. Aggiornamento nel database
+    const updatedUser = await prisma.user.update({
+      where: { id: id },
+      data: updateData,
+      select: { id: true, name: true, email: true, role: true },
+    });
+
+    // 4. AGGIORNAMENTO DELLA SESSIONE NEXTAUTH (Cruciale se l'utente aggiorna se stesso)
+    // Se si tratta di un'azione Admin che aggiorna un altro utente, questa parte può essere omessa
+    // o condizionata per non aggiornare la sessione dell'Admin.
+    /*  await signIn("credentials", {
+            redirect: false,
+            user: {
+                id: updatedUser.id,
+                name: updatedUser.name,
+                email: updatedUser.email,
+                role: updatedUser.role,
+            },
+            update: true,
+        } as any);
+ */
+    // 5. Invalida la cache
+    revalidatePath("/admin/users"); // Per aggiornare la tabella admin
+    revalidatePath("/dashboard/profile"); // Per aggiornare il profilo
+
+    return {
+      success: true,
+      message: "Dati utente aggiornati con successo!",
+    };
+  } catch (error) {
+    console.error("Errore nell'aggiornamento dei dati utente base:", error);
+    return {
+      success: false,
+      message: "Errore nel salvataggio dei dati utente. Riprova più tardi.",
+    };
+  }
+}
+
+/**
+ * Schema Zod esteso che include tutti i campi di spedizione PIÙ l'ID utente.
+ * Questo schema è utilizzato per validare il payload dell'azione updateUserProfile.
+ */
+const userProfileUpdateSchema = shippingAddressSchema.extend({
+  // L'ID utente DEVE essere incluso nel payload per l'azione server
+  userId: z.string().min(1, "ID Utente necessario per l'aggiornamento"),
+});
+
+/**
+ * Tipizzazione del payload che la funzione updateUserProfile si aspetta.
+ */
+type UserProfileUpdatePayload = z.infer<typeof userProfileUpdateSchema>;
 
 // ----------------------------------------------------------------------
 // --- FUNZIONI UTILITY (Check Reindirizzamento) ---
@@ -141,7 +251,7 @@ export async function signUpUser(prev: unknown, formData: FormData) {
       data: {
         name: rawUser.name,
         email: rawUser.email,
-        password: hashedPassword,
+        password: hashedPassword, // Assegna il ruolo predefinito se necessario
       },
     });
 
@@ -176,17 +286,18 @@ export async function signUpUser(prev: unknown, formData: FormData) {
  * 🚨 FUNZIONE PRECEDENTEMENTE OMESSA (getUserById)
  */
 export async function getUserById(userId: string) {
+  console.log("Tentativo di recuperare utente con ID:", userId);
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       id: true,
       name: true,
       email: true,
+      role: true,
       address: true,
     },
   }); // Assicurati di convertire l'indirizzo JSON in un oggetto JavaScript utilizzabile
   // Se l'indirizzo non è nullo, esegui la conversione
-
   return user
     ? {
         ...user,
@@ -264,23 +375,17 @@ export async function saveShippingAddress(
 }
 
 // ----------------------------------------------------------------------
-// 💡 FUNZIONE: AGGIORNAMENTO PROFILO
+// 💡 FUNZIONE: AGGIORNAMENTO PROFILO (CORRETTA)
 // ----------------------------------------------------------------------
 
 /**
  * Aggiorna i dettagli di spedizione e profilo dell'utente autenticato, salvando il JSON 'address'.
  */
 export async function updateUserProfile(
-  data: UserProfileUpdatePayload
+  payload: UserProfileUpdatePayload
 ): Promise<ActionResponse> {
-  const session = await auth();
-  const userId = session?.user?.id;
-
-  if (!userId) {
-    return { success: false, message: "Non autorizzato. Utente non loggato." };
-  }
-
-  const validationResult = shippingAddressSchema.safeParse(data);
+  // 1. Validazione Zod: Validiamo L'INTERO PAYLOAD (incluso userId)
+  const validationResult = userProfileUpdateSchema.safeParse(payload);
 
   if (!validationResult.success) {
     const errorMsg = validationResult.error.issues
@@ -288,39 +393,47 @@ export async function updateUserProfile(
       .join("; ");
     return { success: false, message: `Errore di validazione: ${errorMsg}` };
   }
-  const validatedData = validationResult.data;
+
+  const { userId, ...validatedAddressData } = validationResult.data;
+  const validatedData = validatedAddressData;
+
   const newFullName = `${validatedData.firstName} ${validatedData.lastName}`;
 
+  // 💡 Ottimizzazione: Estrazione esplicita dei dati per il campo JSON 'address'
+  const { firstName, lastName, ...addressData } = validatedData;
+
   try {
-    // 1. Aggiornamento nel database
+    // 2. Aggiornamento nel database
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        name: newFullName, // Aggiorniamo il nome
-        address: validatedData as Prisma.InputJsonValue, // Aggiorniamo l'indirizzo
+        // Aggiorniamo il nome combinato
+        name: newFullName,
+        // Aggiorniamo l'oggetto address JSON
+        address: addressData as Prisma.InputJsonValue,
       },
       select: {
         id: true,
         name: true,
         email: true,
-        role: true, // Assumendo che role sia nel modello
+        role: true,
       },
     });
 
-    // ⭐ 2. AGGIORNAMENTO DELLA SESSIONE DI NEXTAUTH
-    // Questo forza il frontend a rigenerare la sessione con i nuovi dati (es. il nuovo nome).
+    // 3. AGGIORNAMENTO DELLA SESSIONE NEXTAUTH
+    // Rigenera la sessione con i nuovi dati (essenziale per nome/ruolo)
     await signIn("credentials", {
       redirect: false,
       user: {
         id: updatedUser.id,
         name: updatedUser.name,
         email: updatedUser.email,
-        role: updatedUser.role, // Passa i campi necessari per l'ExtendedUser
+        role: updatedUser.role,
       },
-      update: true, // Indica a NextAuth di aggiornare la sessione corrente
-    } as any);
+      update: true,
+    } as any); // Il cast 'as any' è spesso necessario qui
 
-    // 3. Invalida la cache
+    // 4. Invalida la cache per la pagina del profilo
     revalidatePath("/dashboard/profile");
 
     return {
@@ -329,6 +442,9 @@ export async function updateUserProfile(
     };
   } catch (error) {
     console.error("Errore nell'aggiornamento del profilo:", error);
+
+    // Gestione di errori specifici di Prisma (es. violazione unique) qui se necessario
+
     return {
       success: false,
       message: "Errore nel salvataggio del profilo. Riprova più tardi.",
@@ -385,7 +501,7 @@ export async function getOrderDetailsAction(orderId: string) {
   try {
     const order = await prisma.order.findFirst({
       where: {
-        id: orderId,
+        orderNumber: orderId,
         userId: userId, // CRUCIALE: Filtra per l'utente corrente
       },
       include: {
@@ -460,10 +576,9 @@ export async function createOrderAction() {
 
     const { address, paymentMethod } = user;
 
-    const currentCartItems = cart.items as BackendCartItem[];
-
-    // Subito dopo la riga
+    const currentCartItems = cart.items as BackendCartItem[]; // Subito dopo la riga
     // const currentCartItems = cart.items as BackendCartItem[];
+
     console.log(
       "DEBUG: Struttura Reale Primo Articolo:",
       JSON.stringify(currentCartItems[0], null, 2)
@@ -582,9 +697,8 @@ export async function updatePasswordAction(
 
   const currentPassword = formData.get("currentPassword") as string;
   const newPassword = formData.get("newPassword") as string;
-  const confirmPassword = formData.get("confirmPassword") as string;
+  const confirmPassword = formData.get("confirmPassword") as string; // 1. Validazione di base (Dovresti usare Zod qui!)
 
-  // 1. Validazione di base (Dovresti usare Zod qui!)
   if (
     !currentPassword ||
     !newPassword ||
@@ -602,9 +716,8 @@ export async function updatePasswordAction(
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { password: true },
-    });
+    }); // 3. Verifica la password corrente
 
-    // 3. Verifica la password corrente
     if (!user?.password) {
       // Questo caso non dovrebbe accadere se l'utente è loggato con credentials
       // Ma è cruciale se l'utente ha loggato con Google e non ha una password.
@@ -625,17 +738,14 @@ export async function updatePasswordAction(
         success: false,
         message: "La password corrente non è corretta.",
       };
-    }
+    } // 4. Hash e Aggiornamento della nuova password
 
-    // 4. Hash e Aggiornamento della nuova password
     const hashedPassword = hashSync(newPassword, 10);
 
     await prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
-    });
-
-    // 5. Successo
+    }); // 5. Successo
     // NOTA: Non serve aggiornare la sessione (signIn update) qui,
     // perché la sessione non tiene traccia dell'hash della password.
 
@@ -655,93 +765,163 @@ export async function updatePasswordAction(
  * Recupera un riepilogo di tutti gli ordini per l'utente autenticato.
  */
 export async function getMyOrdersSummaryAction() {
-    const session = await auth();
-    const userId = session?.user?.id;
+  const session = await auth();
+  const userId = session?.user?.id;
 
-    if (!userId) {
-        // Non lanciamo un errore ma restituiamo un array vuoto
-        return [];
-    }
+  if (!userId) {
+    // Non lanciamo un errore ma restituiamo un array vuoto
+    return [];
+  }
 
-    try {
-        const orders = await prisma.order.findMany({
-            where: { userId: userId },
-            orderBy: { createdAt: 'desc' }, // Ordina dal più recente
-            select: {
-                orderNumber: true,
-                createdAt: true,
-                totalPrice: true,
-                status: true,
-                // Includiamo solo l'ID del primo articolo per mostrare l'immagine in anteprima
-                OrderItem: {
-                    take: 1, 
-                    select: { image: true }
-                }
-            },
-        });
+  try {
+    const orders = await prisma.order.findMany({
+      where: { userId: userId },
+      orderBy: { createdAt: "desc" }, // Ordina dal più recente
+      select: {
+        orderNumber: true,
+        createdAt: true,
+        totalPrice: true,
+        status: true, // Includiamo solo l'ID del primo articolo per mostrare l'immagine in anteprima
+        OrderItem: {
+          take: 1,
+          select: { image: true },
+        },
+      },
+    }); // 1. Conversione in array JavaScript per l'uso lato client.
+    // 2. Assicuriamo che totalPrice sia un numero (se Prisma lo restituisce come Decimal).
 
-        // 1. Conversione in array JavaScript per l'uso lato client.
-        // 2. Assicuriamo che totalPrice sia un numero (se Prisma lo restituisce come Decimal).
-        const sanitizedOrders = orders.map(order => ({
-            orderNumber: order.orderNumber,
-            createdAt: order.createdAt,
-            totalPrice: Number(order.totalPrice), // ⭐ Conversione in Number
-            status: order.status,
-            // Recupera l'immagine del primo prodotto per l'anteprima
-            mainImage: order.OrderItem[0]?.image || '/placeholder.jpg' 
-        }));
+    const sanitizedOrders = orders.map((order) => ({
+      orderNumber: order.orderNumber,
+      createdAt: order.createdAt,
+      totalPrice: Number(order.totalPrice), // ⭐ Conversione in Number
+      status: order.status, // Recupera l'immagine del primo prodotto per l'anteprima
+      mainImage: order.OrderItem[0]?.image || "/placeholder.jpg",
+    }));
 
-        return sanitizedOrders;
-    } catch (error) {
-        console.error("Errore nel recupero del riepilogo ordini:", error);
-        return [];
-    }
+    return sanitizedOrders;
+  } catch (error) {
+    console.error("Errore nel recupero del riepilogo ordini:", error);
+    return [];
+  }
 }
-
-
 
 // Questo tipo assicura che 'address' sia presente.
 export type FullUserProfile = Prisma.UserGetPayload<{}> & {
-    // Rendiamo 'address' obbligatorio per la tipizzazione, anche se il valore può essere un oggetto vuoto
-    address: Prisma.JsonValue; 
-    // Aggiungi qui anche gli altri campi richiesti dal tuo form se mancano (es. 'role')
-    role: string | null;
-    password: string | null;
+  // Rendiamo 'address' obbligatorio per la tipizzazione, anche se il valore può essere un oggetto vuoto
+  address: Prisma.JsonValue; // Aggiungi qui anche gli altri campi richiesti dal tuo form se mancano (es. 'role')
+  role: string | null;
+  password: string | null;
 };
 /**
  * Recupera i dettagli completi dell'utente loggato dal DB, incluso l'indirizzo.
  * Questa funzione è usata dal Server Component ProfilePage.
  */
 export async function getFullUser(): Promise<FullUserProfile | null> {
-    const session = await auth();
-    const userId = session?.user?.id;
+  const session = await auth();
+  const userId = session?.user?.id;
 
-    if (!userId) {
-        return null; 
+  if (!userId) {
+    return null;
+  }
+
+  try {
+    // Recupera tutti i campi utente
+    const user = await prisma.user.findUnique({
+      where: { id: userId }, // Non serve 'include' se 'address' è un campo JSON su User
+    });
+
+    if (user) {
+      // ⭐ TRASFORMAZIONE E ASSERZIONE DEL TIPO:
+      // Assicuriamo che l'oggetto 'address' esista. Se il valore del DB è null, usiamo un oggetto vuoto.
+      const userWithAddress = {
+        ...user, // Il cast a {} (oggetto vuoto) è cruciale se 'address' nel DB è null.
+        address: user.address || {},
+      } as FullUserProfile;
+
+      return userWithAddress;
     }
 
+    return null; // Utente non trovato nel DB
+  } catch (error) {
+    console.error("Errore nel recupero dell'utente completo:", error);
+    return null;
+  }
+}
+
+// Otteniamo tutti gli utenti
+
+/**
+ * Recupera tutti gli utenti con paginazione.
+ * ✅ RISOLVE L'ERRORE: Restituisce dataCount e serializza i dati.
+ */
+export async function getAllUsers({
+    limit = PAGE_SIZE,
+    page,
+    query,
+}: {
+    limit?: number;
+    page: number;
+    query?: string;
+}) {
     try {
-        // Recupera tutti i campi utente
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            // Non serve 'include' se 'address' è un campo JSON su User
-        });
-        
-        if (user) {
-            // ⭐ TRASFORMAZIONE E ASSERZIONE DEL TIPO:
-            // Assicuriamo che l'oggetto 'address' esista. Se il valore del DB è null, usiamo un oggetto vuoto.
-            const userWithAddress = {
-                ...user,
-                // Il cast a {} (oggetto vuoto) è cruciale se 'address' nel DB è null.
-                address: user.address || {}, 
-            } as FullUserProfile;
-            
-            return userWithAddress;
-        }
+        // 1. Definisci le Condizioni di Filtro (WHERE Clause)
+        const searchCondition = query ? {
+            // Utilizziamo l'operatore OR per cercare il testo in più campi
+            OR: [
+                {
+                    name: {
+                        contains: query,
+                        mode: 'insensitive' as const, // Permette la ricerca case-insensitive (richiede PostgreSQL o MySQL)
+                    },
+                },
+                {
+                    email: {
+                        contains: query,
+                        mode: 'insensitive' as const,
+                    },
+                },
+                // Puoi aggiungere altri campi qui, come 'id' se pertinente
+            ],
+        } : {};
 
-        return null; // Utente non trovato nel DB
+        // 2. Query per il Conteggio Totale (con il filtro)
+        const dataCount = await prisma.user.count({
+            where: searchCondition, // Applica la condizione di ricerca
+        });
+
+        // 3. Query per i Dati della Pagina Corrente (con il filtro e la paginazione)
+        const rawUsers = await prisma.user.findMany({
+            where: searchCondition, // Applica la condizione di ricerca
+            orderBy: { createdAt: "desc" },
+            skip: (page - 1) * limit,
+            take: limit,
+        });
+
+        // 4. Conversione e Restituzione
+        const users = rawUsers.map((user) => convertToPlainObject(user));
+
+        return {
+            data: users as User[],
+            dataCount: dataCount,
+            totalPages: Math.ceil(dataCount / limit),
+        };
     } catch (error) {
-        console.error("Errore nel recupero dell'utente completo:", error);
-        return null; 
+        console.error("Errore in getAllUsers:", error);
+        return {
+            data: [] as User[],
+            dataCount: 0,
+            totalPages: 0,
+        };
     }
+}
+
+// Placeholder per un'azione di eliminazione, utile per la tua tabella
+export async function deleteUser(id: string) {
+  try {
+    await prisma.user.delete({ where: { id } });
+    revalidatePath("/admin/users");
+    return { success: true, message: "Utente eliminato con successo." };
+  } catch (error) {
+    return { success: false, message: formatError(error) };
+  }
 }

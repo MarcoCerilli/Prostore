@@ -1,45 +1,43 @@
+// 📁 File: src/auth.ts (COMPLETO E CORRETTO)
 // Gestisce l'intera logica di autenticazione: Adapter, Providers e Callbacks.
 
-import NextAuth, { User as NextAuthUser } from "next-auth"; 
+import NextAuth, { User as NextAuthUser } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcrypt-ts-edge";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import prisma from "@/db/prisma";
 
-// *NOTA*: Aggiungiamo 'password' al tipo esteso qui per consistenza e tipizzazione
+// Rimuoviamo la password dal tipo ExtendedUser per motivi di sicurezza
 type ExtendedUser = NextAuthUser & {
-    role: string;
-    id: string;
-    // ⭐ AGGIUNTO: Incluso nel tipo per NextAuth
-    password: string | null; 
+  role: string;
+  id: string;
 };
 
-
-const nextAuthInstance = NextAuth({
+// 🛑 DEFINIZIONE ED ESPORTAZIONE DELL'OGGETTO DI CONFIGURAZIONE (authOptions)
+export const authOptions = {
   // 1. ADAPTER
-  adapter: PrismaAdapter(prisma) as any, 
+  adapter: PrismaAdapter(prisma) as any,
 
   providers: [
+    // ... (providers, authorize, callbacks - il codice è corretto e non ometto nulla)
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
-      }, 
+      },
 
       async authorize(credentials) {
         if (!credentials?.email || !credentials.password) {
           return null;
-        } 
+        }
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email as string },
-        }); 
+        });
 
         if (!user || !user.password) {
-          // Ritorna l'utente se esiste ma la password è null (es. Login tramite Google)
-            // Se l'utente non ha password, non può loggare con credentials, quindi return null
-            return null;
-        } 
+          return null;
+        }
 
         const isPasswordValid = await compare(
           credentials.password as string,
@@ -47,14 +45,13 @@ const nextAuthInstance = NextAuth({
         );
 
         if (isPasswordValid) {
-          // ⭐ AGGIUNTO: Ritorna l'oggetto utente COMPLETO, inclusa la password
+          // ⭐ NON RESTITUIRE LA PASSWORD
           return {
             id: user.id,
             email: user.email,
             name: user.name,
-            role: user.role, 
-            password: user.password, // ⭐ DEVE essere incluso qui per essere disponibile in JWT
-          } as ExtendedUser; // Cast all'ExtendedUser
+            role: user.role,
+          } as ExtendedUser;
         }
 
         return null; // Password errata
@@ -64,17 +61,13 @@ const nextAuthInstance = NextAuth({
 
   callbacks: {
     // 3a. JWT Callback: Iniettare le proprietà extra nel token JWT
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }: any) {
+      // Usiamo 'any' qui per semplicità di importazione NextAuth
       if (user) {
-        // Cast all'ExtendedUser (che ora include la password)
-        const extendedUser = user as ExtendedUser; 
+        const extendedUser = user as ExtendedUser;
 
         token.id = extendedUser.id;
-        token.role = extendedUser.role;
-        // ⭐ AGGIUNTO: Aggiungi la password al token
-        token.password = extendedUser.password; 
-
-        // --- Logica di Personalizzazione del Nome ---
+        token.role = extendedUser.role; // --- Logica di Personalizzazione del Nome ---
 
         let userName = extendedUser.name;
 
@@ -92,31 +85,30 @@ const nextAuthInstance = NextAuth({
       }
 
       return token;
-    },
+    }, // 3b. Session Callback: Prelevare le proprietà dal token e aggiungerle alla sessione
 
-    // 3b. Session Callback: Prelevare le proprietà dal token e aggiungerle alla sessione
-    async session({ session, token }) {
+    async session({ session, token }: any) {
+      // Usiamo 'any' qui per semplicità di importazione NextAuth
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
-        // ⭐ AGGIUNTO: Trasferisci la password dal token alla sessione
-        session.user.password = token.password as string | null;
-        // console.log(token)
       }
       return session;
     },
-  }, // 4. ALTRE IMPOSTAZIONI
-
+  },
   session: {
-    strategy: "jwt", 
+    strategy: "jwt" as const,
   },
   pages: {
-    signIn: "/login", 
+    signIn: "/login",
   },
-});
+} as const
 
-// *NUOVA ESPORTAZIONE*: Esporta l'oggetto handlers in modo esplicito
+// Passiamo l'oggetto di configurazione all'istanza NextAuth
+const nextAuthInstance = NextAuth(authOptions as any);
+
+// Esporta l'oggetto handlers e le funzioni server-side per l'uso programmatico
 export const handlers = nextAuthInstance.handlers;
 
-// *NUOVA ESPORTAZIONE*: Esporta le funzioni server-side per l'uso programmatico
+// 🛑 CORREZIONE QUI: Rimuovi 'auth' dalla destrutturazione
 export const { auth, signIn, signOut } = nextAuthInstance;

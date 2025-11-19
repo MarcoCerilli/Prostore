@@ -1,28 +1,30 @@
 import { shippingAddress } from "@/types";
 
-export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME||'Prostore';
-export const APP_DESCRIPTION = process.env.NEXT_PUBLIC_APP_DESCRIPTION||'A MODERN ECOMMERCE STORE BUILT WITH NEXT.JS';
-export const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL||'http://localhost:3000';
+export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Prostore";
+export const APP_DESCRIPTION =
+  process.env.NEXT_PUBLIC_APP_DESCRIPTION ||
+  "A MODERN ECOMMERCE STORE BUILT WITH NEXT.JS";
+export const SERVER_URL =
+  process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3000";
 
-export const LATEST_PRODUCTS_LIMIT = Number (process.env.LATEST_PRODUCTS_LIMIT) || 4; 
-
+export const LATEST_PRODUCTS_LIMIT =
+  Number(process.env.LATEST_PRODUCTS_LIMIT) || 4;
 
 export const signInDefaultValues = {
-    email:"",
-    password: "",
+  email: "",
+  password: "",
 };
 export const signUpDefaultValues = {
-    name:"",
-    email:"",
-    password: "",
-    confirmPassword: "",
+  name: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
 };
 
-
 export const shippingAddressValues: shippingAddress = {
-  firstName: "", 
+  firstName: "",
   lastName: "",
-  street: "", 
+  street: "",
   houseNumber: "",
   phoneNumber: "",
   city: "",
@@ -32,6 +34,34 @@ export const shippingAddressValues: shippingAddress = {
   longitude: null,
 };
 
+export const productDefaultValues = {
+  name: "",
+  slug: "",
+  category: "",
+  image: [],
+  brand: "",
+  description: "",
+  price: 0,
+  stock: 0,
+  rating: 0,
+  numReviews: 0,
+  isFeatured: false,
+  banner: null,
+};
+
+
+export const  USER_ROLES = process.env.USER_ROLES?.split(",") || ["user","admin"];
+
+
+
+
+
+
+
+
+
+
+
 /*
  * =================================================================================
  * NOTE DI RIPASSO CRITICHE PER PRISMA, NEXT.JS E TYPESCRIPT
@@ -39,7 +69,7 @@ export const shippingAddressValues: shippingAddress = {
  * * 1. PROBLEMI DI CARICAMENTO AMBIENTE (DATABASE_URL)
  * ---------------------------------------------------
  * CAUSA: Il compilatore (o la CLI di Prisma/tsx) NON legge automaticamente il .env.
- * SOLUZIONE: 
+ * SOLUZIONE:
  * - ELIMINARE: il file 'prisma.config.ts' (interferisce con il caricamento CLI).
  * - MIGRAZIONE/SEEDING: Usare sempre il flag --env-file=.env per i comandi:
  * es. npx tsx --env-file=.env ./db/seed.ts

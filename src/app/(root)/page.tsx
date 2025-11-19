@@ -1,38 +1,64 @@
 import ProductList from "@/components/ui/shared/product/product-list";
-import { getLatestProducts } from "@/lib/actions/product.actions";
-import { Product } from "@/types"; // Importiamo il tipo Product
+import {
+  getLatestProducts,
+  getFeaturedProducts,
+} from "@/lib/actions/product.actions";
+import { Product } from "@/types";
+import ProductCarousel from "@/components/ui/shared/product/product-carousel"; // Aggiungi l'import del Carousel
+import ViewAllProductsButton from "@/components/view-all-products-button";
 
 const Homepage = async () => {
-  // data è di tipo Product[] | null
-  const data = await getLatestProducts();
-  // Inizializziamo l'array vuoto. Se i dati sono nulli o vuoti, useremo questo.
+  // 1. CHIAMATE API
+  // dataLatest è di tipo Product[] | null
+  const dataLatest = await getLatestProducts();
+  // dataFeatured è di tipo Product[] | null (assumendo che getFeaturedProducts sia tipizzata così)
+  const dataFeatured = await getFeaturedProducts();
+
+  // 2. INIZIALIZZAZIONE SICURA (latestProducts)
   let latestProducts: Product[] = [];
-  // 1. Controllo per evitare che 'null' venga passato
-  if (data && Array.isArray(data)) {
-    latestProducts = data;
+  if (dataLatest && Array.isArray(dataLatest)) {
+    latestProducts = dataLatest;
   }
-  // 2. Controllo per la visualizzazione di fallback (NESSUN PRODOTTO)
-  if (latestProducts.length === 0) {
+
+  // 3. INIZIALIZZAZIONE SICURA (featuredProducts)
+  let featuredProducts: Product[] = [];
+  if (dataFeatured && Array.isArray(dataFeatured)) {
+    // Qui applichi il tuo filtro, assicurandoti che abbiano il banner
+    featuredProducts = dataFeatured.filter((p) => p.banner);
+  }
+
+  // DEBUGGING (Verifica finale)
+  console.log("Prodotti Nuovi Arrivi (Latest):", latestProducts.length);
+  console.log("Prodotti In Vetrina (Featured):", featuredProducts.length);
+
+  // 4. Controllo per la visualizzazione di fallback
+  if (latestProducts.length === 0 && featuredProducts.length === 0) {
     return (
-      <div className="wrapper py-20 text-center min-h-screen pt-40">
-        <h2 className="text-3xl font-bold text-gray-800">
-          Nessun Prodotto Trovato
-        </h2>
-        <p className="text-muted-foreground mt-4 text-lg">
-          Non ci sono prodotti nel database.
-        </p>
+      <div className="wrapper">
+        <h1 className="h1-bold text-center mt-10 mb-8">
+          Benvenuto su ProStore
+        </h1>
+        <div className="text-center mt-20 text-gray-500">
+          Al momento non sono disponibili prodotti in vetrina o nuovi arrivi.
+        </div>
+        <ViewAllProductsButton /> {/* 🛑 INCLUSO NEL FALLBACK */}
       </div>
     );
   }
 
-  // 3. Renderizzazione finale (Il codice arriva qui SOLO se latestProducts è Product[] e ha elementi)
+  // 5. Renderizzazione finale
   return (
     <div className="wrapper">
-      <h1 className="h1-bold text-center mt-10 mb-8">Benvenuto su ProStore</h1>
+            <h1 className="h1-bold text-center mt-10 mb-8">Benvenuto su ProStore</h1>
 
-      {/* Ora latestProducts è garantito essere Product[] (non Product[] | null) */}
-      <ProductList data={latestProducts} title="Nuovi Arrivi" />
-    </div>
+            {/* Mostra il Carousel solo se ci sono prodotti in vetrina */}
+            {featuredProducts.length > 0 && <ProductCarousel data={featuredProducts} />}
+
+            {/* Mostra la lista Nuovi Arrivi solo se ci sono prodotti */}
+            {latestProducts.length > 0 && <ProductList data={latestProducts} title="Nuovi Arrivi" />}
+            
+            <ViewAllProductsButton /> 
+        </div>
   );
 };
 

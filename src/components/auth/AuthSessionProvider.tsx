@@ -1,9 +1,16 @@
+// 📁 File: src/components/auth/AuthSessionProvider.tsx
 "use client";
 
 import { SessionProvider } from 'next-auth/react';
+import { Session } from 'next-auth'; // Importa il tipo Session di NextAuth per la tipizzazione
 import React from 'react';
 
-// Questo wrapper deve essere un componente client
-export function AuthSessionProvider({ children }: { children: React.ReactNode }) {
-  return <SessionProvider>{children}</SessionProvider>;
+export function AuthSessionProvider({ 
+  children, 
+  session 
+}: { 
+  children: React.ReactNode, 
+  session: Session | null | undefined 
+}) {
+  return <SessionProvider session={session}>{children}</SessionProvider>;
 }

@@ -12,8 +12,7 @@ import OrderSummaryCards from "@/components/admin/OrderSummaryCards";
 import AdminOrderRow from "@/components/admin/AdminOrderRow"; 
 import { getAllOrdersSummaryAction } from "@/lib/actions/admin.actions"; 
 import SalesChart from '@/components/admin/SalesChart';
-
-
+import AdminSearch from "@/components/admin/admin-search";
 
 
 
@@ -44,11 +43,14 @@ export default async function AdminOrdersPage() {
             </div>
             <Card>
                 <CardHeader>
-                    <CardTitle>Riepilogo Ordini ({orders.length})</CardTitle>
-                    <OrderSummaryCards/>
-                    <SalesChart/>
+                 {/*    <CardTitle>Riepilogo Ordini ({orders.length})</CardTitle> */}
+                   {/*  <OrderSummaryCards/>
+                    <SalesChart/> */}
                 </CardHeader>
                 <CardContent>
+                    <div className="mb-6">
+                        <AdminSearch />
+                    </div>
                     {orders.length === 0 ? (
                         <p className="text-center text-gray-500 py-8">Nessun ordine trovato.</p>
                     ) : (

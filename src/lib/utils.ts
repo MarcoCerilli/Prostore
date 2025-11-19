@@ -179,3 +179,11 @@ export async function formatError(error: any): Promise<string> {
       : JSON.stringify(error.message);
   }
 }
+
+/**
+ * Formatta una stringa ID (es. ID di Prisma) per renderla leggibile (prime 4 cifre + ultima 4 cifre).
+ */
+export function formatId(id: string) {
+    if (!id || id.length < 8) return id;
+    return `${id.substring(0, 4)}...${id.substring(id.length - 4)}`;
+}

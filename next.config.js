@@ -8,7 +8,14 @@ const nextConfig = {
         protocol: "https",
         // Sostituisci 'logolook.net' con il tuo dominio se usi un'altra fonte
         hostname: "logolook.net",
-        // Se necessario, puoi aggiungere pathname, e port
+      },
+      {
+        protocol: "https",
+        hostname: "utfs.io",
+      },
+      {
+        protocol: "https",
+        hostname: "i.placehold.co",
       },
     ],
   },

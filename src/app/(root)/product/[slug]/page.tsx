@@ -2,8 +2,8 @@ import { getProductBySlug } from "@/lib/actions/product.actions";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator"; // 🛑 CORREZIONE: Usa il tuo componente UI/Separator
-import { Star } from "lucide-react"; // Importa l'icona Star
+import { Separator } from "@/components/ui/separator"; 
+import { Star } from "lucide-react"; 
 import ProductPrice from "@/components/ui/shared/product/product-price";
 import ProductImages from "@/components/ui/shared/product/product-images";
 import AddToCart from "@/components/ui/shared/product/add-to-cart";
@@ -13,10 +13,7 @@ import { CartItemFrontend } from "@/types";
 
 export const dynamic = 'force-dynamic';
 
-// --- Tipi per Serializzazione ---
-// (Il blocco SerializedCart e serializeCart non necessita di modifiche funzionali, 
-// ma il return è stato semplificato per chiarezza, è meno fragile.)
-
+// --- Tipi per Serializzazione (Invariato) ---
 type SerializedCart = { 
     id: string; 
     createdAt: string; 
@@ -31,18 +28,16 @@ type SerializedCart = {
 
 const serializeCart = (cart: Awaited<ReturnType<typeof getMyCart>>): SerializedCart => {
     if (!cart) return null;
-
     const replacer = (key: string, value: any) => {
         if (value instanceof Decimal) return value.toNumber();
         if (value instanceof Date) return value.toISOString();
         return value;
     };
-
     const jsonString = JSON.stringify(cart, replacer);
     return JSON.parse(jsonString) as SerializedCart;
 }
 
-// --- Componente: Visualizzazione Stelle Grafiche ---
+// --- Componente: Visualizzazione Stelle Grafiche (Invariato) ---
 interface StarRatingProps {
     value: number;
 }
@@ -50,7 +45,6 @@ interface StarRatingProps {
 const StarRatingDisplay = ({ value }: StarRatingProps) => {
     const maxStars = 5;
     const fullStars = Math.floor(value);
-    // Logica per mostrare mezza stella
     const hasHalfStar = value % 1 >= 0.25 && value % 1 < 0.75; 
     const emptyStars = maxStars - fullStars - (hasHalfStar ? 1 : 0);
 
@@ -89,22 +83,20 @@ const ProductDetailsPage = async (props: {
     const cart = serializeCart(rawCart);
 
     const productPriceNumber = Number(product.price); 
-    // Assicurati di convertire rating
     const productRatingNumber = Number(product.rating); 
 
     return (
-        // 🛑 CORREZIONE LAYOUT: Usa max-w-7xl mx-auto per centrare, SENZA 'container'
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16 min-h-screen">
             
-            {/* CONTENITORE PRINCIPALE: GRIGLIA ASIMMETRICA 3:2 (Totale 5 colonne) */}
+            {/* CONTENITORE PRINCIPALE: GRIGLIA ASIMMETRICA 3:3 (Totale 6 colonne usate su 7) */}
             <div className="grid grid-cols-1 lg:grid-cols-7 gap-x-12 gap-y-10">
                 
-                {/* COLONNA 1 (Immagini: 3/5) */}
+                {/* COLONNA 1 (Immagini: 3/7) */}
                 <div className="lg:col-span-3">
                     <ProductImages images={product.images} />
                 </div>
                 
-                {/* COLONNA 2 (Dettagli Prodotto & Acquisto: 2/5) */}
+                {/* COLONNA 2 (Dettagli Prodotto & Acquisto: 3/7) */}
                 <div className="lg:col-span-3 space-y-6">
                     
                     {/* 1. Dettagli/Header Prodotto */}
@@ -161,7 +153,6 @@ const ProductDetailsPage = async (props: {
                                             id: product.id,
                                             name: product.name,
                                             slug: product.slug,
-                                            // Converte il prezzo in stringa per l'utilizzo nel carrello
                                             price: productPriceNumber.toFixed(2), 
                                             quantity: 1, 
                                             image: product.images?.[0] || '',
@@ -173,18 +164,27 @@ const ProductDetailsPage = async (props: {
                     </Card>
 
                     {/* Servizi Aggiuntivi (Esempio) */}
-                    <div className="mt-6 text-sm text-gray-600 space-y-2">
-                        <div className="flex items-center">📦 Spedizione rapida in 24/48h</div>
-                        <div className="flex items-center">🔄 Reso facile entro 30 giorni</div>
+                    <div className="mt-6 text-lg font-bold text-gray-600 space-y-2">
+                        <div className="flex items-center justify-center">📦 Spedizione rapida in 24/48h</div>
+                        <div className="flex items-center justify-center">🔄 Reso facile entro 30 giorni</div>
                     </div>
 
+                </div> {/* Fine COLONNA 2 (Dettagli & Acquisto) */}
+
+
+                {/* COLONNA 3: Spazio Vuoto (1/7) - Mantiene l'asimmetria */}
+                <div className="lg:col-span-1 hidden lg:block">
+                    {/* Spazio lasciato vuoto per allineamento */}
                 </div>
-            </div>
+
+            </div> {/* Fine CONTENITORE PRINCIPALE: GRIGLIA */}
             
-            {/* SEZIONE DESCRIZIONE & DETTAGLI (A tutta larghezza nel container principale) */}
+            
+            {/* 🌟 SEZIONE DESCRIZIONE & DETTAGLI (POSIZIONE CORRETTA: A tutta larghezza, sotto la griglia) 🌟 */}
             <section className="mt-16 pt-10 border-t border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">Descrizione Prodotto</h2>
-                <div className="text-gray-700 leading-relaxed max-w-4xl">
+                <h2 className="text-2xl text-center font-bold text-gray-800 mb-4">Descrizione Prodotto</h2>
+                {/* Usiamo max-w-4xl mx-auto per centrare il testo nel container a tutta larghezza */}
+                <div className="text-gray-700 leading-relaxed max-w-4xl mx-auto">
                     {product.description}
                 </div>
             </section>

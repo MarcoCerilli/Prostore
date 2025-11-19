@@ -18,6 +18,7 @@ import { OrderStatus } from "@/types";
 import { getOrderDetailsAction } from "@/lib/actions/user.actions";
 import { formatCurrency, formatOrderDate } from "@/lib/utils"; // Import delle utility
 
+
 // --- DEFINIZIONI DI TIPO AGGIORNATE (Mantenute Invariate) ---
 type OrderDetails = {
   itemsPrice: number;
@@ -89,22 +90,25 @@ interface OrderDetailsPageProps {
     orderId: string;
   };
 }
-export default async function OrderDetailsPage({
-  params,
-}: OrderDetailsPageProps) {
+// Rimuoviamo l'interfaccia dal parametro `params` per non creare ambiguità
+export default async function OrderDetailsPage({ params }: OrderDetailsPageProps) {
+  
+ // Per evitare errori di tipizzazione, risolviamo la Promise implicita e la tipizziamo.
+    const resolvedParams = (await params) as OrderDetailsPageProps['params'];
+    const orderId = resolvedParams.orderId;
 
-  // estraiamo l'ID in modo esplicito
-  const { orderId } = params;
-
-  // Utilizziamo orderId per chiamare la Server Action
-  const order = (await getOrderDetailsAction(orderId)) as OrderDetails | null;
+// 1. Recupero dei Dati: Chiama la Server Action per i dettagli dell'ordine
+    const order = (await getOrderDetailsAction(orderId)) as OrderDetails | null;
 
   if (!order) {
     notFound();
   }
 
-  const currentStatus = statusMap[order.status as OrderStatus];
-  const orderItems = order.OrderItem || []; // Assicuriamo che sia un array per l'iterazione
+ // 3. Preparazione dei Dati per il Rendering
+    const currentStatus = statusMap[order.status as OrderStatus];
+    const orderItems = order.OrderItem || []; // Dettagli degli articoli
+
+
 
   return (
     <main className="p-4 sm:p-8 lg:p-10 bg-gray-50 min-h-screen">
