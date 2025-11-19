@@ -1,6 +1,5 @@
 import React, { useMemo } from "react";
 import Image from "next/image";
-// Rimuoviamo l'importazione di Button che non è più necessario qui
 // import { Button } from "@/components/ui/button"; 
 import { Separator } from "@radix-ui/react-dropdown-menu";
 import {
@@ -10,12 +9,13 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import { CartItemFrontend } from "@/types"; // Importazione del tipo con price: number
 
-// Definizioni di interfaccia (rimangono invariate)
+// Definizioni di interfaccia
 interface CartItem {
     id: string;
     name: string;
-    price: string;
+    price: string; // Questo tipo non viene più utilizzato per le props, ma mantenuto per contesto
     quantity: number;
     image: string;
 }
@@ -26,7 +26,8 @@ interface PaymentDetails {
 }
 
 interface CheckoutSummaryProps {
-    cartItems: CartItem[];
+    // ✅ CORREZIONE: Ora accetta CartItemFrontend[] (price: number)
+    cartItems: CartItemFrontend[]; 
     shippingFee: number;
     taxRate: number;
     onProceed: () => void;
@@ -38,22 +39,19 @@ const CheckoutSummary: React.FC<CheckoutSummaryProps> = ({
     cartItems,
     shippingFee,
     taxRate,
-    // onProceed, // Non necessario poiché il pulsante è stato rimosso
     savedPaymentDetails,
     step,
 }) => {
     
-    // ✅ CORREZIONE CALCOLO COSTI
+    // ✅ CORREZIONE CALCOLO COSTI: i prezzi sono già numeri (CartItemFrontend)
     const { subtotal, tax, total } = useMemo(() => {
-        // Usa parseFloat su item.price, rendendolo robusto con replace
+        
+        // Calcolo subtotale: usa item.price direttamente come numero
         const sub = cartItems.reduce(
-            (sum, item) => 
-                // Assicuriamo che la stringa prezzo sia parsata correttamente
-                sum + parseFloat(item.price.replace(",", ".")) * item.quantity, 
+            (sum, item) => sum + item.price * item.quantity, 
             0
         );
         
-        // 🎯 CORREZIONE: IVA calcolata SOLO sul subtotale degli articoli
         const calculatedTax = sub * taxRate; 
         
         const finalTotal = sub + shippingFee + calculatedTax;
@@ -64,23 +62,12 @@ const CheckoutSummary: React.FC<CheckoutSummaryProps> = ({
     const formatCurrency = (amount: number) =>
         `€${amount.toFixed(2).replace(".", ",")}`;
 
-    // ✅ CORREZIONE LOGICA STATO PULSANTE
     const getButtonState = () => {
-        // Impostiamo sempre isVisible a false perché il pulsante ora è in OrderReview
         let isVisible = false; 
-        
-        // La logica interna non ci interessa più in questo componente
-        switch (step) {
-            case "review":
-                // ...
-                break;
-            default:
-                break;
-        }
         return { isVisible };
     };
 
-    const { isVisible } = getButtonState(); // isVisible sarà sempre false
+    const { isVisible } = getButtonState();
 
     return (
         <Card className="md:col-span-1 h-fit sticky top-4 shadow-xl">
@@ -92,7 +79,7 @@ const CheckoutSummary: React.FC<CheckoutSummaryProps> = ({
             <CardContent className="pt-6">
                 <div className="space-y-4">
                     
-                    {/* Dettagli Articoli (invariati) */}
+                    {/* Dettagli Articoli */}
                     <div className="space-y-4">
                         <h4 className="font-bold text-base mb-2 text-gray-700">
                             Articoli:
@@ -115,8 +102,8 @@ const CheckoutSummary: React.FC<CheckoutSummaryProps> = ({
                                     </span>
                                 </div>
                                 <span className="font-semibold text-gray-800">
-                                    {/* Usa il prezzo parsato correttamente */}
-                                    {formatCurrency(parseFloat(item.price.replace(",", ".")) * item.quantity)} 
+                                    {/* ✅ CORREZIONE: item.price è un number */}
+                                    {formatCurrency(item.price * item.quantity)} 
                                 </span>
                             </div>
                         ))}
@@ -124,7 +111,7 @@ const CheckoutSummary: React.FC<CheckoutSummaryProps> = ({
 
                     <Separator className="my-4 bg-gray-200 h-[1px]" />
 
-                    {/* Sottototali (Aggiornati con la nuova logica IVA) */}
+                    {/* Sottototali */}
                     <div className="space-y-2 text-base">
                         <div className="flex justify-between">
                             <span>Subtotale Articoli</span>
@@ -148,7 +135,7 @@ const CheckoutSummary: React.FC<CheckoutSummaryProps> = ({
                         <span>{formatCurrency(total)}</span>
                     </div>
 
-                    {/* Dettagli Pagamento Salvato (Solo nello step Review - Invariato) */}
+                    {/* Dettagli Pagamento Salvato */}
                     {step === "review" && (
                         <div
                             className={`mt-4 p-3 rounded-lg border text-sm ${savedPaymentDetails ? "border-green-500 bg-green-50/50" : "border-red-500 bg-red-50/50"}`}

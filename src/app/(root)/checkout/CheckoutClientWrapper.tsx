@@ -1,5 +1,3 @@
-// File: src/app/(root)/checkout/CheckoutClientWrapper.tsx
-
 "use client";
 
 // 🚀 Importazioni Corrette e Pulite
@@ -9,8 +7,7 @@ import {
   CheckoutPayload,
   Cart,
   shippingAddress,
-  BackendCartItem,
-  CartItemFrontend,
+  CartItemFrontend, // Assumiamo che qui 'price' sia definito come number
 } from "@/types";
 
 import { useSearchParams, useRouter } from "next/navigation";
@@ -43,7 +40,6 @@ const paypalInitialOptions = {
 
 // ----------------------------------------------------------------------
 // Componente per il Riepilogo/Conferma Finale (Passo 4)
-// ... (OrderReview rimane invariato)
 // ----------------------------------------------------------------------
 interface OrderReviewProps {
   shipping: shippingAddress;
@@ -114,13 +110,13 @@ const OrderReview = ({
 
       <Button
         className="w-full h-12 text-lg bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-lg font-semibold"
-    onClick={handlePlaceOrder}
-    disabled={
-        !payment || isPlacingOrder || !cartData || cartData.items.length === 0
-    }
->
-    {isPlacingOrder ? "Elaborazione Ordine..." : "Conferma Ordine e Paga"}
-</Button>
+        onClick={handlePlaceOrder}
+        disabled={
+          !payment || isPlacingOrder || !cartData || cartData.items.length === 0
+        }
+      >
+        {isPlacingOrder ? "Elaborazione Ordine..." : "Conferma Ordine e Paga"}
+      </Button>
     </div>
   );
 };
@@ -178,7 +174,6 @@ export default function CheckoutClientWrapper({
       }
     };
     fetchCart();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleGoback = () => {
@@ -186,7 +181,7 @@ export default function CheckoutClientWrapper({
 
     switch (currentStepString) {
       case "payment":
-        //Tornas all'indirizzo
+        //Torna all'indirizzo
         newStep = "address";
         break;
       case "review":
@@ -317,11 +312,13 @@ export default function CheckoutClientWrapper({
       return [];
     }
 
-    // 🔑 NOTA: Qui si converte il prezzo in stringa per la visualizzazione/PayPal.
+    // 🔴 CORREZIONE: Convertiamo item.price (che arriva come stringa dal Cart)
+    // in un NUMERO per matchare il tipo CartItemFrontend.price: number.
     return cartData.items.map((item) => ({
       id: item.productId,
       name: item.name,
-      price: item.price.toFixed(2), // Stringa formattata
+      // 🔑 Conversione critica: Assicuriamo che sia un numero
+      price: parseFloat(item.price as unknown as string), 
       quantity: item.qty,
       slug: item.slug,
       image: item.image,
@@ -394,7 +391,7 @@ export default function CheckoutClientWrapper({
           shippingPrice={cartData?.shippingPrice || 0}
           taxPrice={cartData?.taxPrice || 0}
           // ---
-          shippingCost={cartData?.shippingPrice || 0} // Rimosso l'errore di prop mancante
+          shippingCost={cartData?.shippingPrice || 0} 
           vatRate={TAX_RATE}
           items={displayCartItems}
           userId={userId}
