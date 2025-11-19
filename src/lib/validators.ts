@@ -61,34 +61,36 @@ export const signUpFormSchema = z
     path: ["confirmpassword"],
   });
 
+// SCHEMA PRODOTTO BASE (quello che hai fornito)
 export const insertProductschema = z.object({
   name: z.string().min(3, "Il nome deve contenere almeno 3 caratteri!"),
   slug: z.string().min(3, "Lo slug deve contenere almeno 3 caratteri!"),
-  category: z
-    .string()
-    .min(3, "La categoria deve contenere almeno 3 caratteri!"),
+  category: z.string().min(3, "La categoria deve contenere almeno 3 caratteri!"),
   brand: z.string().min(3, "La marca deve contenere almeno 3 caratteri!"),
-  description: z
-    .string()
-    .min(3, "La descrizione deve contenere almeno 3 caratteri!"),
+  description: z.string().min(3, "La descrizione deve contenere almeno 3 caratteri!"),
   stock: z.coerce.number().int("Stock deve essere un numero intero valido"),
-  images: z
-    .array(z.string())
-    .min(1, "Il prodotto deve avere almeno un'immagine"),
+  images: z.array(z.string()).min(1, "Il prodotto deve avere almeno un'immagine"),
   isFeatured: z.boolean(),
   banner: z
     .preprocess(
-      (val) => (val === "" ? null : val), //Trasfoma la stringa vuota in null
+      (val) => (val === "" ? null : val),
       z.string().url("URL banner non valido").nullable()
     )
     .optional(),
-  price: priceSchema,
+  price: priceSchema, // Assumo che priceSchema sia definito altrove
 });
 
-//SCHEMA PER AGGIORNARE I PRODOTTI
-export const updateProductSchema = insertProductschema.extend({
+// Estendiamo lo schema di base rendendo id opzionale
+export const CombinedProductFormSchema = insertProductschema.extend({
+  // L'ID è richiesto solo nell'Update, ma nel form deve essere opzionale/presente
+  id: z.string().optional(), 
+});
+
+// SCHEMA PER AGGIORNARE I PRODOTTI (Mantenuto per le azioni del server)
+export const updateProductSchema = CombinedProductFormSchema.extend({
   id: z.string().min(1, "Id è richiesto"),
 });
+
 
 // --- Schemi di Checkout e Carrello ---
 
@@ -318,3 +320,4 @@ export const insertReviewSchema = z.object({
     .max(5, "Il voto non può essere superiore a 5."),
 
 }); 
+

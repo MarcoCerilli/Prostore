@@ -1,31 +1,29 @@
+// Componente: ProductForm.tsx
+
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { productDefaultValues } from "@/lib/constants";
-import { insertProductschema, updateProductSchema } from "@/lib/validators";
+// Importazioni corrette (assumo che CombinedProductFormSchema, insertProductschema, updateProductSchema siano definiti)
+import { CombinedProductFormSchema, insertProductschema, updateProductSchema } from "@/lib/validators"; 
 import { Product } from "@/types";
 import { useRouter } from "next/navigation";
 import {
-  ControllerRenderProps,
   SubmitHandler,
   useForm,
-  // ⭐️ NOTA: Non serve FieldValues se FormSchemaType è correttamente definito
-  FieldValues,
 } from "react-hook-form";
-import z from "zod";
+import * as z from "zod"; 
 import {
   Form,
-  FormItem,
   FormLabel,
   FormMessage,
   FormField,
   FormDescription,
   FormControl,
-}
-// Assicurati che questo import sia corretto per i tuoi componenti di form
-from "../ui/form";
+  FormItem,
+} from "../ui/form";
 import slugify from "slugify";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
@@ -35,10 +33,10 @@ import { UploadButton } from "@/lib/uploadthing";
 import { Card, CardContent } from "../ui/card";
 import Image from "next/image";
 
-// Definisci il tipo dello schema del form in base al contesto.
-// Usiamo la logica dello schema dinamico
-type FormSchemaType = z.infer<typeof insertProductschema> | z.infer<typeof updateProductSchema>;
-
+// ⭐️ FIX: Tipi derivati dagli schemi Zod per un uso pulito nelle action e nel form
+type FormSchemaType = z.infer<typeof CombinedProductFormSchema>;
+type InsertSchemaType = z.infer<typeof insertProductschema>;
+type UpdateSchemaType = z.infer<typeof updateProductSchema>;
 
 
 const ProductForm = ({
@@ -54,41 +52,73 @@ const ProductForm = ({
   const { toast } = useToast();
 
   // 1. SCELTA DELLO SCHEMA
+  // Il tipo dello schema non è strettamente necessario qui, ma è utile per il resolver
   const schema = type === "Update" ? updateProductSchema : insertProductschema;
   
   // 2. LOGICA DEI DEFAULT VALUES
-  const defaultValues =
+  // 💡 FIX: La logica qui deve produrre un FormSchemaType in entrambi i rami
+  const defaultValues: FormSchemaType =
     product && type === "Update"
-      ? ({
+      ? {
+          // Aggiornamento: usa i dati esistenti, assicurando che id, images, isFeatured e banner siano presenti
           ...product,
+          // L'ID viene garantito qui dall'esterno, se non c'è, verrà gestito da zod
+          id: productId, 
           images: product.images || [],
           isFeatured: product.isFeatured ?? false,
           banner: product.banner || "",
-        } as FormSchemaType) // Casting a FormSchemaType
-      : ({
+        }
+      : {
+          // Creazione: usa i default values, assicurando che id sia undefined
           ...productDefaultValues,
+          id: undefined, // Importante che sia undefined per lo schema di creazione
           images: [],
           isFeatured: false,
           banner: "",
-          // ⚠️ FIX PER IL PREZZO: Zod number non accetta undefined
-          price: (productDefaultValues.price || 0), 
-          stock: (productDefaultValues.stock || 0),
-        } as FormSchemaType); // Casting a FormSchemaType
+          // FIX: Coercizione a numero/valore predefinito corretto per evitare problemi di tipizzazione iniziale
+          price: productDefaultValues.price || 0, 
+          stock: productDefaultValues.stock || 0,
+        };
 
-  // 3. useForm con il tipo dinamico
+  // 3. useForm con il tipo unico e resolver specifico
   const form = useForm<FormSchemaType>({
-    resolver: zodResolver(schema as any),
+    // ⭐️ FIX: Cast the resolver to match FormSchemaType to resolve type mismatch
+    resolver: zodResolver(schema) as any, 
     defaultValues: defaultValues,
   });
 
-  const onSubmit: SubmitHandler<FormSchemaType> = async (values) => {
-    // La logica di onSubmit è corretta
-    const action = type === "Create" ? createProduct(values as z.infer<typeof insertProductschema>) : updateProduct({
-        ...values,
-        id: productId!,
-      } as z.infer<typeof updateProductSchema> & { id: string });
+  // Estrazione di watch per immagini e isFeatured
+  const images = form.watch("images");
+  const isFeatured = form.watch("isFeatured");
 
-    const res = await action;
+  // Funzione per generare lo slug
+  const handleGenerateSlug = () => {
+    const name = form.getValues("name");
+    if (name) {
+      const slug = slugify(name, {
+        lower: true,
+        strict: true,
+      });
+      form.setValue("slug", slug, { 
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+  };
+
+  const onSubmit: SubmitHandler<FormSchemaType> = async (values) => {
+    let res;
+    
+    if (type === "Create") {
+      // ⭐️ FIX: Per la creazione, togliamo l'ID opzionale presente in FormSchemaType
+      const { id, ...createValues } = values; 
+      // Castiamo solo al tipo necessario per l'Action
+      res = await createProduct(createValues as InsertSchemaType); 
+    } else {
+      // Per l'aggiornamento, l'ID è richiesto e garantito dal `defaultValues` (almeno nella logica)
+      // Castiamo solo al tipo necessario per l'Action
+      res = await updateProduct(values as UpdateSchemaType);
+    }
 
     if (!res.success) {
       toast({ variant: "destructive", description: res.message });
@@ -98,34 +128,43 @@ const ProductForm = ({
     }
   };
 
-  const images = form.watch("images") as string[];
-  // isFeatured viene watchato più in basso.
-
-  // Funzione helper per la rimozione dell'immagine
+  // Funzione helper per la rimozione dell'immagine (logica OK)
   const handleRemoveImage = (urlToRemove: string) => {
     const newImages = images.filter((img: string) => img !== urlToRemove);
-    // ✅ OK: Casting esplicito del valore in FormSchemaType['images']
-    form.setValue("images", newImages as any, {
+    form.setValue("images", newImages, { 
       shouldValidate: true,
       shouldDirty: true,
     });
     toast({ description: "Immagine rimossa." });
   };
+  
+  // Funzione helper per la rimozione del banner (logica OK)
+  const handleRemoveBanner = () => {
+    // Assegnamo la stringa vuota, che il preprocess di Zod trasformerà in null/undefined
+    form.setValue("banner", "", { 
+        shouldValidate: true,
+        shouldDirty: true,
+    });
+    toast({ description: "Banner rimosso." });
+  };
+
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6">
-      {/* Non è necessario il casting (as any) se l'import di Form è corretto e `useForm` è tipizzato */}
+      {/* <Form {...form}> è corretto perché `form` è un UseFormReturn */}
       <Form {...form}>
         <form
           method="POST"
           onSubmit={form.handleSubmit(onSubmit)}
           className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6"
         >
+          {/* --- Sezione Dati Base --- */}
+          
           {/* ROW 1: Nome & Slug (50/50) */}
           <div className="md:col-span-1">
-            {/* Nome */}
             <FormField
-              name="name" // ✅ CORRETTO
+              control={form.control}
+              name="name" 
               render={({ field }) => (
                 <FormItem className="w-full">
                   <FormLabel>Nome Prodotto</FormLabel>
@@ -143,9 +182,9 @@ const ProductForm = ({
           </div>
 
           <div className="md:col-span-1">
-            {/* Slug */}
             <FormField
-              name="slug" // ✅ CORRETTO
+              control={form.control}
+              name="slug" 
               render={({ field }) => (
                 <FormItem className="w-full">
                   <FormLabel>Slug (URL Amichevole)</FormLabel>
@@ -160,20 +199,7 @@ const ProductForm = ({
                   <div className="flex justify-end mt-2">
                     <Button
                       type="button"
-                      onClick={() => {
-                        const name = form.getValues("name");
-                        if (name) {
-                          const slug = slugify(name, {
-                            lower: true,
-                            strict: true,
-                          });
-                          // ✅ OK: Setting del valore dello slug
-                          form.setValue("slug", slug as any, { 
-                            shouldValidate: true,
-                            shouldDirty: true,
-                          });
-                        }
-                      }}
+                      onClick={handleGenerateSlug}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white"
                       aria-label="Genera Slug Automatico"
                     >
@@ -187,9 +213,9 @@ const ProductForm = ({
 
           {/* ROW 2: Category & Brand (50/50) */}
           <div className="md:col-span-1">
-            {/* Category */}
             <FormField
-              name="category" // ✅ CORRETTO
+              control={form.control}
+              name="category" 
               render={({ field }) => (
                 <FormItem className="w-full">
                   <FormLabel>Categoria</FormLabel>
@@ -205,12 +231,11 @@ const ProductForm = ({
               )}
             />
           </div>
-di nulla
 
           <div className="md:col-span-1">
-            {/* Brand */}
             <FormField
-              name="brand" // ✅ CORRETTO
+              control={form.control}
+              name="brand" 
               render={({ field }) => (
                 <FormItem className="w-full">
                   <FormLabel>Marchio (Brand)</FormLabel>
@@ -229,9 +254,9 @@ di nulla
 
           {/* ROW 3: Price & Stock (50/50) */}
           <div className="md:col-span-1">
-            {/* Price */}
             <FormField
-              name="price" // ✅ CORRETTO
+              control={form.control}
+              name="price" 
               render={({ field }) => (
                 <FormItem className="w-full">
                   <FormLabel>Prezzo (€)</FormLabel>
@@ -241,12 +266,14 @@ di nulla
                       {...field}
                       type="number"
                       className="h-10"
-                      // FIX: Gestione della conversione del valore per input numerico (necessario per input type="number" di react-hook-form)
+                      // FIX: Gestione della conversione del valore per input numerico (valore a 0 se campo vuoto)
                       onChange={(e) => {
                         const value = e.target.value;
-                        field.onChange(value === "" ? 0 : Number(value));
+                        // Usiamo parse float se i prezzi possono avere decimali
+                        field.onChange(value === "" ? 0 : parseFloat(value)); 
                       }}
-                      value={field.value ?? ""}
+                      // FIX: Se il valore è null/undefined, mostriamo una stringa vuota
+                      value={field.value ?? ""} 
                     />
                   </FormControl>
                   <FormMessage />
@@ -256,9 +283,9 @@ di nulla
           </div>
 
           <div className="md:col-span-1">
-            {/* Stock */}
             <FormField
-              name="stock" // ✅ CORRETTO
+              control={form.control}
+              name="stock" 
               render={({ field }) => (
                 <FormItem className="w-full">
                   <FormLabel>Giacenza (Quantità Disponibile)</FormLabel>
@@ -268,11 +295,13 @@ di nulla
                       {...field}
                       type="number"
                       className="h-10"
-                      // FIX: Gestione della conversione del valore per input numerico
+                      // FIX: Gestione della conversione del valore per input numerico (valore a 0 se campo vuoto)
                       onChange={(e) => {
                         const value = e.target.value;
-                        field.onChange(value === "" ? 0 : Number(value));
+                        // Usiamo parseInt perché stock è intero
+                        field.onChange(value === "" ? 0 : parseInt(value, 10)); 
                       }}
+                      // FIX: Se il valore è null/undefined, mostriamo una stringa vuota
                       value={field.value ?? ""}
                     />
                   </FormControl>
@@ -285,13 +314,14 @@ di nulla
           {/* ROW 4: Description (Textarea) - Full Width */}
           <div className="md:col-span-2">
             <FormField
-              name="description" // ✅ CORRETTO
+              control={form.control}
+              name="description" 
               render={({ field }) => (
                 <FormItem className="w-full">
                   <FormLabel>Descrizione Dettagliata</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Scrivi qui una descrizione completa del prodotto, evidenziando le caratteristiche principali e i benefici per il cliente."
+                      placeholder="Scrivi qui una descrizione completa del prodotto..."
                       className="resize-none min-h-[150px]"
                       {...field}
                     />
@@ -302,11 +332,14 @@ di nulla
             />
           </div>
 
+          {/* --- Sezione Immagini & Vetrina --- */}
+          
           {/* ROW 5: Immagini - Full Width */}
           <div className="md:col-span-2">
             <FormField
-              name="images" // ✅ CORRETTO
-              render={() => (
+              control={form.control}
+              name="images" 
+              render={() => ( // Non usiamo field, usiamo images (watch)
                 <FormItem className="w-full">
                   <FormLabel>Immagini Prodotto</FormLabel>
                   <FormDescription className="mb-2">
@@ -317,21 +350,20 @@ di nulla
                     <CardContent className="space-y-2 mt-2 min-h-48">
                       <div className="flex flex-wrap items-start gap-4">
                         {/* Visualizzazione e rimozione delle immagini */}
-                        {images &&
-                        Array.isArray(images) &&
+                        {Array.isArray(images) &&
                         images.length > 0
                           ? images.map((image: string, index: number) => (
                               <div
                                 key={index}
                                 className="relative group w-20 h-20 rounded-sm border cursor-pointer overflow-hidden"
-                                onClick={() => handleRemoveImage(image)} // Rimuovi al click
+                                onClick={() => handleRemoveImage(image)} 
                               >
                                 <Image
                                   src={image}
                                   alt={`Immagine ${index + 1}`}
                                   className="object-cover transition-opacity duration-300 group-hover:opacity-50"
                                   fill
-                                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                  sizes="80px" 
                                 />
                                 {/* Overlay di rimozione */}
                                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -352,12 +384,14 @@ di nulla
                                 onClientUploadComplete={(
                                   res: { url: string }[]
                                 ) => {
+                                  // OK: newImages ha il tipo corretto (string[])
+                                  const newImages = [
+                                    ...(Array.isArray(images) ? images : []),
+                                    res[0].url,
+                                  ];
                                   form.setValue(
                                     "images",
-                                    [
-                                      ...(Array.isArray(images) ? images : []),
-                                      res[0].url,
-                                    ] as any, // Casting a any per il valore dell'array
+                                    newImages, // Rimosso (as any)
                                     { shouldValidate: true, shouldDirty: true }
                                   );
 
@@ -405,7 +439,8 @@ di nulla
             <Card>
               <CardContent className="p-4">
                 <FormField
-                  name="isFeatured" // ✅ CORRETTO
+                  control={form.control}
+                  name="isFeatured" 
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-start space-x-3">
                       <FormControl>
@@ -421,8 +456,7 @@ di nulla
                         </FormLabel>
                         <FormDescription>
                           Seleziona per mostrare questo prodotto nella sezione
-                          "In Vetrina" del tuo negozio (come un prodotto in
-                          evidenza).
+                          "In Vetrina" del tuo negozio.
                         </FormDescription>
                       </div>
                       <FormMessage />
@@ -431,9 +465,10 @@ di nulla
                 />
 
                 {/* Sezione Banner Condizionale */}
-                {form.watch("isFeatured") && ( // Watchiamo isFeatured
+                {isFeatured && ( // Watchiamo isFeatured
                   <FormField
-                    name="banner" // ✅ CORRETTO
+                    control={form.control}
+                    name="banner" 
                     render={({ field }) => (
                       <div className="mt-6 border p-4 rounded-lg bg-gray-50/50">
                         <FormLabel className="text-sm font-semibold mb-3 text-indigo-700 block">
@@ -444,7 +479,7 @@ di nulla
                         {field.value && (
                           <div className="mb-4">
                             <Image
-                              src={field.value as string}
+                              src={field.value}
                               alt="Anteprima Banner"
                               className="w-full object-cover object-center rounded-lg shadow-md aspect-[16/6]"
                               width={1920}
@@ -456,14 +491,7 @@ di nulla
                               type="button"
                               variant="destructive"
                               size="sm"
-                              onClick={() => {
-                                // ✅ OK: Setting del valore del banner a stringa vuota (che Zod preprocessa a null)
-                                form.setValue("banner", "" as any, {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
-                                toast({ description: "Banner rimosso." });
-                              }}
+                              onClick={handleRemoveBanner}
                               className="mt-2"
                             >
                               Rimuovi Banner
