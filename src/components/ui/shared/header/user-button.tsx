@@ -24,7 +24,7 @@ const UserButton = () => {
   // 2. Se NON autenticato, mostra il link Sign In
   if (!isAuthenticated) {
     return (
-      <Button asChild>
+      <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white">
         <Link href="/sign-in">
           <UserIcon className="w-5 h-5 mr-2" />
           Accedi

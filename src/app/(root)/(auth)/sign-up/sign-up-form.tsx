@@ -33,7 +33,7 @@ const SignUpButton = () => {
   return (
     <Button
       type="submit"
-      className="w-full flex items-center justify-center"
+      className="w-full flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white"
       disabled={pending}
       variant="default"
     >

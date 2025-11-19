@@ -32,9 +32,9 @@ export default function AdminOverviewPage() {
             {/* 2. SEZIONE GRAFICO VENDITE */}
             <section>
                 <Card>
-                    <CardHeader>
-                        <CardTitle>Andamento Vendite</CardTitle>
-                    </CardHeader>
+                  {/*   <CardHeader>
+                      {/*   <CardTitle>Andamento Vendite</CardTitle> 
+                    </CardHeader> */}
                     <CardContent>
                         {/* Il grafico occupa lo spazio principale */}
                         <SalesChart />

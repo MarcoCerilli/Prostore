@@ -10,8 +10,7 @@ import {
   paymentResultSchema,
 } from "@/lib/validators";
 import { OrderItem } from "./order";
-import { Decimal } from "@prisma/client/runtime/library";
-
+import { insertReviewSchema } from "@/lib/validators";
 // -----------------------------------------------------------
 // 1. Tipi per i prodotti e gli articoli del carrello
 // -----------------------------------------------------------
@@ -38,7 +37,7 @@ export type BackendCartItem = {
 export type CartItemFrontend = {
   id: string; // Mappato da productId
   name: string;
-  price: number; // Prezzo formattato come stringa
+  price: number;
   quantity: number; // Mappato da qty
   slug: string;
   image: string;
@@ -110,4 +109,8 @@ export interface CheckoutPayload {
 
 export type paymentResult = z.infer<typeof paymentResultSchema>;
 
-
+export type Review = z.infer<typeof insertReviewSchema> & {
+  id: string;
+  createdAt: Date;
+  user?: { name: string};  
+};

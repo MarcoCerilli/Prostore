@@ -1,6 +1,7 @@
 import { PAYMENT_METHODS } from "@/types";
 import * as z from "zod";
 import { updateUserProfile } from "./actions/user.actions";
+import { title } from "process";
 
 // --- Schemi di Prezzo ---
 
@@ -304,3 +305,16 @@ export const updateUserSchema = updateUserProfileSchema.extend({
   id: z.string().min(1, "Id è richiesto"),
   role: z.string().min(1, "Il ruolo è richiesto"),
 });
+
+
+//Schema per insrire recensioni
+export const insertReviewSchema = z.object({
+    title: z.string().min(3, "Il titolo deve contenere almeno 3 caratteri"),
+    description: z.string().min(3, "La descrizione deve contenere almeno 3 caratteri"),
+    productId: z.string().min(1, "Id prodotto è richiesto"),
+   rating: z.coerce
+    .number()
+    .min(1, "Il voto non può essere inferiore a 1.")
+    .max(5, "Il voto non può essere superiore a 5."),
+
+}); 

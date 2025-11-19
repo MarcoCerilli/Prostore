@@ -55,7 +55,7 @@ const CredentialsSignInform = ({ callbackUrl }: { callbackUrl: string }) => {
   };
   
   const SignInButton = () => (
-      <Button disabled={isLoading} className="w-full" variant="default">
+      <Button disabled={isLoading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" variant="default">
         {isLoading ? "Signing In..." : "Accedi"}
       </Button>
     );

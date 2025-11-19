@@ -8,7 +8,6 @@ datasource db {
 }
 
 model Product {
-    // ... (resta invariato)
     id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
     name        String
@@ -18,17 +17,14 @@ model Product {
     brand       String
     description String
     stock       Int
-
     price  Decimal @default(0) @db.Decimal(12, 2)
     rating Decimal @default(0) @db.Decimal(3, 2)
-
     numReviews Int     @default(0)
     isFeatured Boolean @default(false)
     banner     String?
-
     createdAt DateTime @default(now()) @db.Timestamp(6)
-
     OrderItem OrderItem[]
+    reviews review[]
 }
 
 model User {
@@ -48,6 +44,7 @@ model User {
     Session       Session[]
     Cart          Cart[]    @relation("UserCarts") // RINOMINATA in "UserCarts"
     Order         Order[]   @relation("UserOrders") // RINOMINATA in "UserOrders"
+    review        review[]
 }
 
 model Account {
@@ -159,3 +156,19 @@ model OrderItem {
 
     @@id([orderId, productId], map: "orderitems_orderId_productId_pk")
 }
+
+model review  {
+    id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+    productId String   @db.Uuid
+    userId    String   @db.Uuid
+    rating    Int
+    title     String
+    description String
+    isVerifiedPurchase Boolean @default(true)
+    createdAt DateTime @default(now()) @db.Timestamp(6)
+
+    product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+    user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([productId, userId], map: "review_productId_userId_unique")
+}   
