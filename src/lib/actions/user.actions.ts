@@ -18,7 +18,9 @@ import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { convertToPlainObject } from "../utils";
-import { updateUserSchema } from "../validators"; // Importa il tuo schema appena definito
+import { updateUserSchema } from "../validators"; 
+import Stripe from 'stripe';
+
 
 type UserBaseUpdatePayload = z.infer<typeof updateUserSchema>;
 
@@ -648,7 +650,7 @@ export async function createOrderAction() {
           data: { stock: { decrement: item.qty } },
         });
       } // 3.4. Cancella il Carrello
-      await tx.cart.delete({
+      await tx.cart.deleteMany({
         where: { id: cart.id },
       });
 
@@ -924,4 +926,146 @@ export async function deleteUser(id: string) {
   } catch (error) {
     return { success: false, message: formatError(error) };
   }
+}
+
+
+
+
+// Inizializza Stripe SDK. Assumiamo che la chiave segreta sia in una variabile d'ambiente.
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+    apiVersion: '2025-11-17.clover', 
+});
+
+// * DEFINIZIONE DEI TIPI DI RISPOSTA
+type PaymentStatusResponse = {
+    status: 'SUCCESS' | 'FAILURE' | 'PENDING';
+    message: string;
+    orderNumber: string;
+    paymentIntentId: string;
+};
+
+/**
+ * Verifica lo stato del Payment Intent di Stripe e aggiorna il database.
+ * * Utilizza lo schema Prisma fornito dall'utente.
+ * @param orderNumber Il numero dell'ordine (@unique) da aggiornare.
+ * @param clientSecret Il client secret passato da Stripe per recuperare l'Intent.
+ * @param redirectStatus Lo stato di reindirizzamento fornito da Stripe.
+ * @returns {Promise<PaymentStatusResponse>} L'oggetto contenente lo stato finale e il messaggio.
+ */
+export async function getPaymentIntentStatusAction(
+    orderNumber: string,
+    clientSecret: string,
+    redirectStatus: string
+): Promise<PaymentStatusResponse> {
+    
+    // Controlli preliminari
+    if (!clientSecret || !orderNumber) {
+        return {
+            status: 'FAILURE',
+            message: 'Dati di pagamento insufficienti per la verifica.',
+            orderNumber: orderNumber,
+            paymentIntentId: 'N/A'
+        };
+    }
+    
+    try {
+        // 1. Estrai l'ID del Payment Intent dal client secret
+        const paymentIntentId = clientSecret.split('_secret_')[0];
+
+        if (!paymentIntentId) {
+            return {
+                status: 'FAILURE',
+                message: 'Formato del client secret non valido.',
+                orderNumber: orderNumber,
+                paymentIntentId: 'N/A'
+            };
+        }
+
+        // 2. Recupera il Payment Intent da Stripe (Server-side)
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+        if (!paymentIntent) {
+            return {
+                status: 'FAILURE',
+                message: 'Payment Intent non trovato su Stripe.',
+                orderNumber: orderNumber,
+                paymentIntentId: paymentIntentId
+            };
+        }
+
+        // 3. Verifica lo stato del pagamento e aggiorna Prisma
+        switch (paymentIntent.status) {
+            case 'succeeded':
+                // Pagamento avvenuto con successo
+                
+                // *** LOGICA DI AGGIORNAMENTO AGGIUSTATA PER IL TUO SCHEMA ***
+                const updatedOrder = await prisma.order.update({
+                    where: { orderNumber: orderNumber }, // Usa il campo unico orderNumber
+                    data: { 
+                        status: 'PAID', // Imposta lo stato Enum 'PAID'
+                        stripePaymentIntentId: paymentIntent.id, // Salva l'ID di Stripe (assumendo che sia stato aggiunto)
+                        paidAt: new Date(), // Imposta la data/ora di pagamento
+                        // Puoi anche salvare il paymentResult JSON se necessario:
+                        // paymentResult: paymentIntent as any, 
+                    },
+                });
+                // *** FINE LOGICA DI AGGIORNAMENTO AGGIUSTATA ***
+
+                // Se l'aggiornamento riesce:
+                return {
+                    status: 'SUCCESS',
+                    message: `Il pagamento è stato completato con successo. L'ordine #${updatedOrder.orderNumber} è confermato!`,
+                    orderNumber: updatedOrder.orderNumber,
+                    paymentIntentId: paymentIntent.id
+                };
+
+            case 'processing':
+                // Pagamento in corso (es. bonifico SEPA)
+                // Aggiorna solo l'ID dell'intent senza marcare come PAID
+                await prisma.order.update({
+                    where: { orderNumber: orderNumber }, 
+                    data: { 
+                        stripePaymentIntentId: paymentIntent.id,
+                        status: 'PENDING_PAYMENT', // Mantiene lo stato iniziale in attesa di notifica webhook
+                    },
+                });
+
+                return {
+                    status: 'PENDING',
+                    message: "Il tuo pagamento è in fase di elaborazione. Riceverai una conferma via email a breve.",
+                    orderNumber: orderNumber,
+                    paymentIntentId: paymentIntent.id
+                };
+
+            case 'requires_payment_method':
+            case 'requires_confirmation':
+            case 'requires_action':
+            case 'canceled':
+                // Pagamento fallito o necessita di azione
+                return {
+                    status: 'FAILURE',
+                    message: "Il pagamento non è riuscito o è stato annullato. Riprova dalla pagina dell'ordine.",
+                    orderNumber: orderNumber,
+                    paymentIntentId: paymentIntent.id
+                };
+            
+            default:
+                 return {
+                    status: 'FAILURE',
+                    message: `Stato di pagamento inatteso: ${paymentIntent.status}. Contatta il supporto.`,
+                    orderNumber: orderNumber,
+                    paymentIntentId: paymentIntent.id
+                };
+        }
+    } catch (error) {
+        // Gestione degli errori di rete o dell'API Stripe/Prisma
+        console.error("ERRORE nella verifica del Payment Intent:", error);
+        
+        return {
+            status: 'FAILURE',
+            message: 'Errore di sistema nella verifica del pagamento. Controlla il log del server.',
+            orderNumber: orderNumber,
+            paymentIntentId: 'N/A'
+        };
+    }
 }

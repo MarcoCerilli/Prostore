@@ -84,10 +84,18 @@ const PAYMENT_METHODS: PaymentMethod[] = [
 
 // Esportiamo il tipo PaymentDetails
 export interface PaymentDetails {
-  last4?: string;
-  holder?: string;
-  method: string;
-  paypalOrderId?: string;
+  // Campi comuni a Carta/PayPal
+    method: string;
+    holder: string; // Nome e cognome del pagante/titolare
+    
+    // Campo per Carta (Stripe/Mock)
+    last4: string | null;
+    
+    // Campo per Stripe Payment Intent (il Secret del PI)
+    clientSecret: string | null; 
+    
+    // Campo per PayPal (l'ID dell'ordine PayPal)
+    paypalOrderId: string | null;
 }
 
 // Interfaccia Props per il componente principale
@@ -159,9 +167,11 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({
     setTimeout(() => {
       setIsSubmitting(false);
       onSuccess({
-        last4: cardNumber.slice(-4),
-        holder: cardName,
-        method: "Carta di Credito / Debito",
+          last4: cardNumber.slice(-4),
+          holder: cardName,
+          method: "Carta di Credito / Debito",
+          clientSecret: null,
+          paypalOrderId: null
       });
     }, 1000); // Simulazione ritardo API
   };
@@ -274,9 +284,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
     // Chiama onSave con i dettagli di pagamento PayPal, includendo l'Order ID di PayPal
     handleSaveDetails({
-      method: "PayPal",
-      holder: holderName,
-      paypalOrderId: details.id, // ✅ Salviamo l'ID Ordine PayPal
+        method: "PayPal",
+        holder: holderName,
+        paypalOrderId: details.id,
+        last4: null,
+        clientSecret: null
     });
   };
 
@@ -316,17 +328,18 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
           <div className="flex justify-center w-full">
             <PayPalButtonComponent
-              orderId={cartId}
-              // 🔑 Passaggio delle props di scomposizione in formato stringa
-              finalPrice={totalPrice.toFixed(2)}
-              itemsPrice={itemsPrice.toFixed(2)}
-              shippingPrice={shippingPrice.toFixed(2)}
-              taxPrice={taxPrice.toFixed(2)}
-              // ---
-              items={items}
-              userId={userId}
-              isPaid={false}
-              onPaymentSuccess={handlePaypalSuccess}
+                      orderId={cartId}
+                      // 🔑 Passaggio delle props di scomposizione in formato stringa
+                      finalPrice={totalPrice.toFixed(2)}
+                      itemsPrice={itemsPrice.toFixed(2)}
+                      shippingPrice={shippingPrice.toFixed(2)}
+                      taxPrice={taxPrice.toFixed(2)}
+                      // ---
+                      items={items}
+                      userId={userId}
+                      isPaid={false}
+                      onPaymentSuccess={handlePaypalSuccess}
+                      shippingAddress={shippingAddress}
             />
           </div>
         </div>
@@ -347,7 +360,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           <Button
             type="button"
             className="w-full h-12 text-lg bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md font-semibold"
-            onClick={() => handleSaveDetails({ method: "Contrassegno" })}
+            onClick={() => handleSaveDetails({
+                method: "Contrassegno",
+                holder: "",
+                last4: null,
+                clientSecret: null,
+                paypalOrderId: null
+            })}
           >
             Procedi al Riepilogo
           </Button>

@@ -30,6 +30,6 @@
     ".next/dev/types/**/*.ts",
     "src/db/sample-data.js",
     "src/app/(root)/checkout/CheckoutPaypalButton.jsx"
-  ],
+, "src/components/order/StripePaymentComponent.tsx"  ],
   "exclude": ["node_modules"]
 }

@@ -35,6 +35,7 @@ export type BackendCartItem = {
 // ✅ TIPO 2: Frontend Item / Output del useMemo (usato in CheckoutSummary e per PayPal)
 // Questo tipo è l'output pulito che hai creato nel useMemo.
 export type CartItemFrontend = {
+  productId: string;
   id: string; // Mappato da productId
   name: string;
   price: number;
@@ -72,12 +73,12 @@ export const DEFAULT_PAYMENT_METHOD =
   process.env.DEFAULT_PAYMENT_METHOD || "Paypal";
 
 export type OrderStatus =
+  | "CREATED"
   | "PENDING_PAYMENT"
   | "PAID"
   | "SHIPPED"
   | "DELIVERED"
   | "CANCELLED";
-
 
 export type Order = z.infer<typeof insertOrderSchema> & {
   id: string;
@@ -100,6 +101,7 @@ export interface CheckoutPayload {
     zip: string;
     country: string;
   };
+  items: CartItemFrontend[];
   paymentmethod: string; // Dati finanziari
   itemsPrice: number;
   shippingPrice: number;
@@ -112,5 +114,5 @@ export type paymentResult = z.infer<typeof paymentResultSchema>;
 export type Review = z.infer<typeof insertReviewSchema> & {
   id: string;
   createdAt: Date;
-  user?: { name: string};  
+  user?: { name: string };
 };

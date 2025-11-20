@@ -1,194 +1,111 @@
-// File: src/app/(root)/order/[orderId]/page.tsx
+// File: app/order/[orderId]/page.tsx
 
-import { notFound } from "next/navigation";
-import PayPalButtonComponent from "@/components/order/PaypalButtonComponent"; 
-import { getOrderDetailsAction } from "@/lib/actions/user.actions"; // ✅ Usiamo la Server Action centralizzata
-import { auth } from "@/auth"; // Necessario per l'ID utente per il componente PayPal
+import { notFound, redirect } from 'next/navigation';
+import { finalizeOrder } from '@/lib/actions/cart.actions'; // La funzione che aggiorna l'ordine e svuota il carrello
+import { getMyCart } from '@/lib/actions/cart.queries';
+import { getOrderDetailsAction } from '@/lib/actions/user.actions';
+import { Cart } from '@/types'; // Assicurati di importare i tipi corretti
 
-// * DEFINIZIONE DEI TIPI *
-// Nota: Questi tipi devono corrispondere esattamente all'oggetto restituito da getOrderDetailsAction.
-interface ShippingAddressType {
-  address: string;
-  city: string;
-  postalCode: string;
-  country: string;
-}
-
-interface OrderItemSimplified {
-    id: string;
-    productId: string; // Se lo aggiungiamo al carrello
-    name: string;
-    qty: number;
-    price: number; // Ora come Number, non Decimal
-    slug: string;
-    image: string;
-}
-
-interface OrderDetails {
-    id: string;
-    orderNumber: string;
-    userId: string;
-    shippingAddress: ShippingAddressType;
-    paymentmethod: string;
-    status: 'PENDING_PAYMENT' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
-    itemsPrice: number;
-    shippingPrice: number;
-    taxPrice: number;
-    totalPrice: number;
-    // ... altri campi (createdAt, paidAt, etc.)
-    OrderItem: OrderItemSimplified[];
-}
-
-
-interface OrderDetailPageProps {
-  params: {
-    orderId: string; // Sarà l'orderNumber (es. ORD-XXXX)
+interface OrderPageProps {
+  params: { orderId: string }; // orderId sarà il tuo orderNumber (es. ORD-12345678)
+  searchParams: { 
+    payment_confirmed?: string; 
+    payment_intent?: string; // ID del Payment Intent di Stripe
   };
 }
 
 /**
- * Pagina Server Component per visualizzare i dettagli di un Ordine.
+ * Funzione Helper per recuperare il Cart ID della sessione
+ * (Assumiamo che getCurrentCart usi i cookies per trovare il carrello attivo)
  */
-export default async function OrderDetailPage({
-  params,
-}: OrderDetailPageProps) {
-  
-  const { orderId } = params; 
-  
-  const validatedOrderId = String(orderId);
-  // Controllo base sulla validità dell'ID/OrderNumber
-  if (!validatedOrderId || validatedOrderId.length < 5) {
+async function getActiveCartId(orderId: string): Promise<string | null> {
+    const cart = await getMyCart();
+    return cart ? cart.id : null;
+}
+
+
+async function OrderSuccessPage({ params, searchParams }: OrderPageProps) {
+  const orderNumber = params.orderId; // Usiamo orderId come orderNumber
+  const { payment_confirmed, payment_intent } = searchParams;
+
+  // 1. RECUPERA I DETTAGLI DELL'ORDINE
+  const orderDetails = await getOrderDetailsAction(orderNumber);
+
+  if (!orderDetails) {
+    // Se l'ordine non esiste, reindirizza o mostra un errore 404
     return notFound();
   }
 
-  // 1. RECUPERA I DATI DALLA SERVER ACTION
-  // La Server Action gestisce il filtro per userId e la ricerca per orderNumber.
-  const order = await getOrderDetailsAction(validatedOrderId) as OrderDetails | null; 
+  // 2. GESTIONE DELLA FINALIZZAZIONE (Solo al primo accesso dopo il pagamento Stripe)
+  const isStripeRedirect = payment_confirmed === 'true' && payment_intent;
 
-  if (!order) {
-    // Non trovato o non appartenente all'utente loggato
-    return notFound();
-  }
-  
-  // Determinazione dello stato di pagamento
-  const isPaid = order.status === 'PAID';
-
-  const shippingAddress = order.shippingAddress;
-  const orderItems = order.OrderItem; 
-  
-  // Determina il testo e il colore in base allo stato
-  const statusColor = isPaid ? "text-green-600" : (order.status === 'CANCELLED' ? "text-red-600" : "text-yellow-600");
-  const statusText = isPaid ? "Pagato" : (order.status === 'PENDING_PAYMENT' ? "In Attesa di Pagamento" : "Stato: " + order.status.replace('_', ' '));
-
-
-  // --- Contenuto della pagina Dettaglio Ordine ---
-
-  return (
-    <div className="container mx-auto p-4 md:p-8 min-h-screen">
-      <h1 className="text-3xl font-bold mb-6">
-        Dettagli Ordine {order.orderNumber}
-      </h1>
-
-      <div className="grid md:grid-cols-3 gap-8">
+  if (isStripeRedirect) {
+    // ⭐ AZIONE CRITICA: Solo se l'ordine non è ancora pagato
+    if (orderDetails.status !== 'PAID') {
         
-        {/* Colonna Dettagli Ordine */}
-        <div className="md:col-span-2">
-          <h2 className="text-xl font-semibold mb-4 border-b pb-2">
-            Articoli Ordinati ({orderItems.length})
-          </h2>
-          
-          {/* Mappa degli Articoli */}
-          {orderItems.map((item, index) => (
-            <div
-              key={item.id || index}
-              className="flex justify-between items-center py-2 border-b last:border-b-0"
-            >
-              <span className="text-gray-700">
-                {item.name} (x{item.qty})
-              </span>
-              <span className="font-medium">
-                €{(item.price * item.qty).toFixed(2)}
-              </span>
-            </div>
-          ))}
+        // Recupera l'ID del carrello dalla sessione corrente
+        const cartId = await getActiveCartId(orderNumber);
 
-          {/* Riepilogo Totali */}
-          <div className="mt-6 space-y-2 text-right">
-            <p>
-              Subtotale:{" "}
-              <span className="font-medium">
-                €{order.itemsPrice.toFixed(2)}
-              </span>
-            </p>
-            <p>
-              Spedizione:{" "}
-              <span className="font-medium">
-                €{order.shippingPrice.toFixed(2)}
-              </span>
-            </p>
-            <p>
-              Tasse:{" "}
-              <span className="font-medium">
-                €{order.taxPrice.toFixed(2)}
-              </span>
-            </p>
-            <p className="text-2xl font-bold pt-2 border-t mt-2">
-              Totale:{" "}
-              <span className="text-red-600">
-                €{order.totalPrice.toFixed(2)}
-              </span>
-            </p>
-          </div>
+        if (cartId) {
+            console.log(`[FINALIZE] Avvio finalizzazione per Ordine ${orderNumber} e Carrello ID ${cartId}`);
+            
+            // Chiama la Server Action che aggiorna lo stato, svuota il carrello e decrementa lo stock.
+            const paymentResultPayload = {
+                payment_intent_id: payment_intent, 
+                status: 'succeeded',
+                method: 'Stripe',
+            };
+
+            const finalizationResult = await finalizeOrder(
+                orderDetails.id, // L'ID interno del DB (non l'OrderNumber)
+                cartId, 
+                paymentResultPayload, 
+                'PAID'
+            );
+
+            if (!finalizationResult.success) {
+                console.error("Errore durante la finalizzazione dell'ordine:", finalizationResult.message);
+                // Puoi registrare l'errore nel DB e reindirizzare l'utente a una pagina di contatto
+            }
+        } else {
+            console.warn("[FINALIZE WARN] Tentativo di finalizzare un ordine pagato, ma carrello non trovato. Ignoro.");
+            // Potrebbe essere successo che il carrello è stato cancellato dal webhook
+        }
+    }
+    
+    // Rimuovi i query params per prevenire chiamate di finalizzazione multiple al refresh
+    // Nota: L'uso di redirect() in un RSC è il modo più pulito
+    redirect(`/order/${orderNumber}`);
+  }
+
+  // 3. RENDER DELLA PAGINA (Riepilogo)
+  return (
+    <div className="container mx-auto py-12">
+        {/* Intestazione */}
+        <div className="bg-green-50 p-6 rounded-lg shadow-md border-t-4 border-green-500">
+            <h1 className="text-3xl font-bold text-green-700 mb-2">🎉 Ordine Confermato!</h1>
+            <p className="text-lg text-green-600">Il tuo ordine #<span className="font-mono">{orderDetails.orderNumber}</span> è stato elaborato con successo.</p>
         </div>
 
-        {/* Colonna Riassunto e Pagamento */}
-        <div className="bg-gray-50 p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Stato e Pagamento</h2>
-
-          <p className="mb-4">
-            Stato Ordine:
-            <span
-              className={`font-bold ml-2 ${statusColor}`}
-            >
-              {statusText}
-            </span>
-          </p>
-
-          {/* Mostra il bottone PayPal solo se non pagato e il metodo di pagamento non è Contrassegno */}
-          {!isPaid && order.paymentmethod !== 'Contrassegno' && (
-              <div className="mt-4">
-                  <h3 className="text-lg font-semibold mb-3">Completa il Pagamento</h3>
-                  <PayPalButtonComponent
-                      orderId={order.orderNumber}
-                      finalPrice={order.totalPrice.toFixed(2)}
-                      itemsPrice={order.itemsPrice.toFixed(2)} 
-                      shippingPrice={order.shippingPrice.toFixed(2)} 
-                      taxPrice={order.taxPrice.toFixed(2)} 
-                      items={orderItems} 
-                      userId={order.userId} 
-                      onPaymentSuccess={(details: any) => { 
-                          // Implementa qui la logica di notifica/ricaricamento
-                          // Esempio: revalidatePath(`/order/${order.orderNumber}`); 
-                          console.log("Pagamento PayPal completato:", details);
-                      }} 
-                      isPaid={isPaid}
-                  />
-              </div>
-          )}
-
-
-          <div className="mt-6 border-t pt-4">
-            <h3 className="font-medium">Indirizzo di Spedizione:</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              {shippingAddress.address}
-              <br />
-              {shippingAddress.city}, {shippingAddress.postalCode}
-              <br />
-              {shippingAddress.country}
+        {/* Stato del pagamento */}
+        <div className="mt-8 p-6 bg-white rounded-lg shadow border">
+            <h2 className="text-xl font-semibold mb-4">Riepilogo e Stato</h2>
+            
+            <p className="mb-2"><strong>Stato Attuale:</strong> 
+                <span className={`px-2 py-1 rounded-full text-sm font-medium ${
+                    orderDetails.status === 'PAID' ? 'bg-green-100 text-green-800' : 
+                    orderDetails.status === 'SHIPPED' ? 'bg-blue-100 text-blue-800' : 
+                    'bg-yellow-100 text-yellow-800'
+                }`}>
+                    {orderDetails.status}
+                </span>
             </p>
-          </div>
+            <p><strong>Totale Pagato:</strong> €{orderDetails.totalPrice.toFixed(2)}</p>
+            {/* Aggiungi qui i dettagli di spedizione, articoli, ecc. */}
         </div>
-      </div>
+        
     </div>
   );
 }
+
+export default OrderSuccessPage;
