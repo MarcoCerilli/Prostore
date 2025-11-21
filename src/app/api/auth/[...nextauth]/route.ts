@@ -7,8 +7,3 @@ import { handlers } from "@/auth";
 // Questo è il modo corretto con Auth.js v5
 
 export const { GET, POST } = handlers;
-
-// Nota: A volte si vede la sintassi abbreviata:
-// export { handler as GET, handler as POST } 
-// Ma la versione estesa (funzioni asincrone) risolve i problemi di tipizzazione
-// che stai incontrando con Next.js 16.0.3 e Turbopack.

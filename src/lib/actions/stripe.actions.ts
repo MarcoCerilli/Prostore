@@ -1,110 +1,157 @@
 "use server";
 
+import prisma from "@/db/prisma";
 import Stripe from "stripe";
-import { CartItemFrontend } from "@/types"; // Assumendo che tu abbia importato i tipi necessari
 
-// ⚠️ CONTROLLO CRITICO CHIAVE AMBIENTE: Legge la chiave una volta sola
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+import { CartItemFrontend } from "@/types";
 
-if (!STRIPE_SECRET_KEY) {
-  console.error(
-    "ERRORE CRITICO CONFIGURAZIONE STRIPE: Variabile d'ambiente STRIPE_SECRET_KEY non è definita."
-  );
-}
-
-// Inizializza Stripe SDK
-const stripe = new Stripe(STRIPE_SECRET_KEY as string, {
-  apiVersion: "2023-10-16" as any,
+// Inizializza Stripe (usa la chiave segreta)
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+  // La versione API deve corrispondere ai tipi installati o a quella del tuo account.
+  // @ts-ignore
+  apiVersion: "2023-10-16", // Puoi anche provare a impostare la tua versione Stripe preferita qui
 });
 
-// * DEFINIZIONE DEI TIPI
-type CreatePaymentIntentParams = {
-  amount: number; // Importo totale in EUR (es. 29.39)
-  cartId: string; // ID del carrello o dell'ordine temporaneo
-  items: CartItemFrontend[]; // Dettagli degli articoli per i metadati
-};
+// 🛠️ FUNZIONE DI GUARDA DI TIPO (Type Guard) per StripeError
+function isStripeError(err: any): err is Stripe.StripeRawError {
+  return err && typeof err === "object" && (err.type || err.rawType);
+}
 
-type PaymentIntentResponse = {
+// Tipizzazione per l'input della Server Action
+interface CreateStripePaymentIntentParams {
+  orderId: string;
+  totalAmount: number;
+  cartItems: CartItemFrontend[];
+  userId: string;
+  baseUrl: string; // Cruciale per il reindirizzamento di Stripe
+}
+
+// Tipizzazione per la risposta della Server Action
+interface StripePaymentIntentResult {
   success: boolean;
-  clientSecret?: string;
+  clientSecret?: string | null;
   message?: string;
-};
+}
 
 /**
- * Crea un nuovo Payment Intent su Stripe e ne restituisce il client_secret.
- * @param params Dati necessari per il pagamento.
- * @returns {Promise<PaymentIntentResponse>} Oggetto contenente il clientSecret in caso di successo.
+ * Crea un Payment Intent (PI) di Stripe o restituisce il PI esistente per un dato ordine (Deduplicazione).
+ * @param params Dettagli dell'ordine e del carrello.
+ * @returns {StripePaymentIntentResult} Risultato con clientSecret o messaggio di errore.
  */
 export async function createStripePaymentIntentAction({
-  amount,
-  cartId,
-  items,
-}: CreatePaymentIntentParams): Promise<PaymentIntentResponse> {
-  console.log(
-    `SERVER DEBUG: Tentativo di creare PI per Cart ID: ${cartId}, Totale: ${amount}`
-  ); // 🛑 CONTROLLO CRITICO PRIMARIO
-
-  const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY; 
-
-  if (STRIPE_SECRET_KEY) {
-    console.log(`STRIPE ENV CHECK: Chiave segreta caricata (Lunghezza: ${STRIPE_SECRET_KEY.length})`); 
-  }
-
-  if (!STRIPE_SECRET_KEY) {
+  orderId,
+  totalAmount,
+  cartItems,
+  userId,
+  baseUrl,
+}: CreateStripePaymentIntentParams): Promise<StripePaymentIntentResult> {
+  // 🎯 Validazione anticipata dell'importo totale
+  if (typeof totalAmount !== "number" || isNaN(totalAmount)) {
     console.error(
-      "STRIPE ERROR: Chiave segreta mancante all'interno dell'azione."
+      `SERVER DEBUG STRIPE ACTION ERROR: Importo totale mancante o non valido: ${totalAmount}`
     );
-    return { success: false, message: "Chiave segreta di Stripe mancante." };
-  } // ✅ Inizializza Stripe QUI, dove la chiave è garantita
-
-
-  const stripe = new Stripe(STRIPE_SECRET_KEY as string, {
-    apiVersion: "2023-10-16" as any,
-  });
-  if (amount <= 0) {
     return {
       success: false,
-      message: "L'importo del pagamento deve essere positivo.",
+      message:
+        "L'importo totale per il pagamento non è stato fornito o non è valido.",
     };
   }
 
   try {
-    // 1. Calcolo dell'importo: Stripe usa centesimi
-    const amountInCents = Math.round(amount * 100); // 2. Creazione del Payment Intent
+    // 1. DEDUPLICAZIONE: Controlla se l'Ordine esiste già e ha un PI associato.
+    const existingOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { stripePaymentIntentId: true, isPaid: true },
+    });
+
+    if (!existingOrder) {
+      console.error(
+        `SERVER DEBUG STRIPE ACTION ERROR: Ordine non trovato per ID ${orderId}`
+      );
+      return {
+        success: false,
+        message: `Ordine con ID ${orderId} non trovato.`,
+      };
+    }
+
+    if (existingOrder.stripePaymentIntentId) {
+      console.log(
+        `SERVER DEBUG STRIPE ACTION DUPLICATION CHECK: PI esistente (${existingOrder.stripePaymentIntentId}) trovato per l'Ordine ID: ${orderId}.`
+      );
+      
+      const existingPi = await stripe.paymentIntents.retrieve(
+        existingOrder.stripePaymentIntentId
+      );
+
+      // Se è già pagato o in uno stato finale, restituiamo il secret.
+      if (
+        existingPi.status === "succeeded" ||
+        existingPi.status === "canceled" ||
+        existingOrder.isPaid
+      ) {
+        return { success: true, clientSecret: existingPi.client_secret };
+      }
+
+      // Se non è in uno stato finale, è ancora valido. Restituiamo il suo secret.
+      // La riga problematica del return_url nell'aggiornamento è stata rimossa, come richiesto.
+      return { success: true, clientSecret: existingPi.client_secret };
+    } 
+    
+    // 2. CREAZIONE NUOVO PI: Se non ne esiste uno, procedi
+
+    const amountInCents = Math.round(totalAmount * 100);
+
+    if (amountInCents <= 0) {
+      console.error(
+        `SERVER DEBUG STRIPE ACTION ERROR: Importo non valido per Stripe: ${totalAmount}`
+      );
+      return {
+        success: false,
+        message:
+          "L'importo totale deve essere maggiore di zero per procedere con il pagamento.",
+      };
+    }
+
+    // Costruzione dell'URL di ritorno (usato nella creazione, dove è supportato)
+    const returnUrl = `${baseUrl}/checkout/successo?order_id=${orderId}`;
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
       currency: "eur",
-      payment_method_types: ["card"], // Esplicita per evitare problemi con la configurazione automatica // Metadati utili per il dashboard di Stripe
       metadata: {
-        cart_id: cartId,
-        items_count: items.length.toString(),
-        description: `Acquisto carrello #${cartId}`,
-      }, // Impostazioni per i metodi di pagamento automatici (opzionale, ma utile)
-   
-    }); // 3. Restituzione del Client Secret al Frontend
+        orderId: orderId,
+        userId: userId,
+      },
+      
+      automatic_payment_methods: { enabled: true },
+    }); 
 
-    if (paymentIntent.client_secret) {
-      console.log("SERVER DEBUG SUCCESS: PI creato. Client Secret restituito.");
-      return {
-        success: true,
-        clientSecret: paymentIntent.client_secret,
-      };
-    } else {
-      return {
-        success: false,
-        message: "Stripe non ha restituito un client_secret valido.",
-      };
-    }
+    // 3. AGGIORNA IL DB con il nuovo PI ID
+    await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        stripePaymentIntentId: paymentIntent.id,
+      },
+    });
+
+    console.log(
+      `SERVER DEBUG STRIPE ACTION SUCCESS: Nuovo PI creato e salvato. ID: ${paymentIntent.id}`
+    );
+    return { success: true, clientSecret: paymentIntent.client_secret };
   } catch (error) {
-    console.error("ERRORE CRITICO nella creazione del Payment Intent:", error);
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : "Errore sconosciuto nella creazione dell'Intent.";
-    return {
-      success: false,
-      message: `Errore Stripe API: ${errorMessage}. Controlla il terminale del server.`,
-    };
+    console.error(
+      "SERVER DEBUG STRIPE ACTION ERROR: Errore durante la creazione del Payment Intent.",
+      error
+    );
+
+    let errorMessage =
+      "Errore sconosciuto durante il Payment Intent. Si prega di riprovare.";
+
+    if (isStripeError(error)) {
+      errorMessage = `Errore Stripe [${error.type} - ${error.code}]: ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = `Errore di sistema: ${error.message}`;
+    }
+    return { success: false, message: errorMessage };
   }
 }

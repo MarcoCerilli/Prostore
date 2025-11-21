@@ -530,7 +530,7 @@ export async function getOrderDetailsAction(orderId: string) {
       shippingPrice: Number(order.shippingPrice),
       taxPrice: Number(order.taxPrice),
       itemsPrice: Number(order.itemsPrice),
-      OrderItem: order.OrderItem.map((item) => ({
+      OrderItem: order.OrderItem.map((item: { price: any; }) => ({
         ...item,
         price: Number(item.price),
       })),
@@ -542,145 +542,6 @@ export async function getOrderDetailsAction(orderId: string) {
   }
 }
 
-// ----------------------------------------------------------------------
-// 💡 FUNZIONE CORRETTA: Creazione dell'Ordine Finale (Place Order)
-// ----------------------------------------------------------------------
-
-export async function createOrderAction() {
-  const session = await auth();
-  const userId = session?.user?.id;
-
-  if (!userId) {
-    throw new Error("Autenticazione richiesta per completare l'ordine.");
-  }
-
-  try {
-    // 1 & 2. Recupero dati Utente e Carrello
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true, address: true, paymentMethod: true },
-    });
-    if (!user) throw new Error("Utente non trovato.");
-
-    const cart = await prisma.cart.findFirst({
-      where: { userId: userId },
-      select: {
-        id: true,
-        items: true,
-        itemsPrice: true,
-        shippingPrice: true,
-        taxPrice: true,
-        totalPrice: true,
-      },
-    });
-    if (!cart || (cart.items as BackendCartItem[]).length === 0)
-      throw new Error("Carrello vuoto.");
-
-    const { address, paymentMethod } = user;
-
-    const currentCartItems = cart.items as BackendCartItem[]; // Subito dopo la riga
-    // const currentCartItems = cart.items as BackendCartItem[];
-
-    console.log(
-      "DEBUG: Struttura Reale Primo Articolo:",
-      JSON.stringify(currentCartItems[0], null, 2)
-    );
-
-    if (!address) redirect("/checkout?step=shipping");
-    if (!paymentMethod) redirect("/checkout?step=payment");
-
-    const isCOD = paymentMethod === "Contrassegno";
-    const initialStatus: OrderStatus = isCOD ? "PENDING_PAYMENT" : "PAID";
-    const paidAtDate = isCOD ? null : new Date(); // 3. Esegui la Transazione
-
-    const createdOrder = await prisma.$transaction(async (tx) => {
-      // 3.1. Crea il record dell'Ordine principale
-      const tempOrder = await tx.order.create({
-        data: {
-          userId: userId,
-          shippingAddress: address as Prisma.InputJsonValue,
-          paymentmethod: paymentMethod,
-          itemsPrice: cart.itemsPrice,
-          shippingPrice: cart.shippingPrice,
-          taxPrice: cart.taxPrice,
-          totalPrice: cart.totalPrice,
-          status: initialStatus,
-          paidAt: paidAtDate,
-          orderNumber: "TEMP",
-        },
-      }); // 3.1.5. Aggiorna orderNumber
-
-      const finalOrderNumber = `ORD-${tempOrder.id.substring(0, 8).toUpperCase()}`;
-      const updatedOrder = await tx.order.update({
-        where: { id: tempOrder.id },
-        data: { orderNumber: finalOrderNumber },
-      }); // 3.2. Crea gli OrderItems
-      const orderItemsData = currentCartItems
-        .filter((item) => {
-          const productIdentifier = item.productId || (item as any).id;
-          return productIdentifier && item.qty > 0;
-        })
-        .map((item) => ({
-          orderId: updatedOrder.id,
-          productId: item.productId || (item as any).id,
-          name: item.name,
-          qty: item.qty,
-          image: item.image,
-          price: item.price,
-          slug: item.slug,
-        }));
-
-      console.log("[DEBUG ITEMS] Dati OrderItem da inviare:", orderItemsData);
-
-      if (orderItemsData.length > 0) {
-        await tx.orderItem.createMany({
-          data: orderItemsData,
-        });
-      } else {
-        throw new Error(
-          "Impossibile creare articoli ordine, dati mancanti o non validi."
-        );
-      } // 3.3. Aggiornamento Stock
-      const validItemsToUpdate = currentCartItems.filter(
-        (item) => item.productId && item.qty > 0
-      );
-      for (const item of validItemsToUpdate) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: item.qty } },
-        });
-      } // 3.4. Cancella il Carrello
-      await tx.cart.deleteMany({
-        where: { id: cart.id },
-      });
-
-      return updatedOrder;
-    }); // 4. Reindirizzamento
-
-    const redirectUrl = `/dashboard/orders/${createdOrder.orderNumber}`;
-    redirect(redirectUrl);
-  } catch (error) {
-    // ✅ CORREZIONE: Controllo sul digest
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
-    console.error("Errore irreversibile nella creazione dell'ordine:", error);
-    throw new Error("Impossibile completare l'ordine. Riprova più tardi.");
-  }
-}
-
-const passwordUpdateSchema = z
-  .object({
-    currentPassword: z.string().min(8, "La password corrente è richiesta."),
-    newPassword: z
-      .string()
-      .min(8, "La nuova password deve essere lunga almeno 8 caratteri."),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Le nuove password non corrispondono.",
-    path: ["confirmPassword"],
-  });
 
 /**
  * Aggiorna la password dell'utente dopo aver verificato quella corrente.
@@ -792,7 +653,7 @@ export async function getMyOrdersSummaryAction() {
     }); // 1. Conversione in array JavaScript per l'uso lato client.
     // 2. Assicuriamo che totalPrice sia un numero (se Prisma lo restituisce come Decimal).
 
-    const sanitizedOrders = orders.map((order) => ({
+    const sanitizedOrders = orders.map((order: { orderNumber: any; createdAt: any; totalPrice: any; status: any; OrderItem: { image: any; }[]; }) => ({
       orderNumber: order.orderNumber,
       createdAt: order.createdAt,
       totalPrice: Number(order.totalPrice), // ⭐ Conversione in Number
@@ -900,7 +761,7 @@ export async function getAllUsers({
         });
 
         // 4. Conversione e Restituzione
-        const users = rawUsers.map((user) => convertToPlainObject(user));
+        const users = rawUsers.map((user: any) => convertToPlainObject(user));
 
         return {
             data: users as User[],

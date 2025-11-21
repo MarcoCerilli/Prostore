@@ -12,7 +12,7 @@ interface PaypalButtonProps {
   shippingPrice: string; // Costo Spedizione (es. "5.00")
   taxPrice: string; // Totale Tasse (es. "20.00")
   items: CartItemFrontend[]; // Array tipizzato (usiamo CartItemFrontend dall'altro file)
-  userId: string;
+  userId: string | null | undefined;
   isPaid: boolean;
   shippingAddress: shippingAddress; // Non usato direttamente in createOrder ma utile per i metadati
   onPaymentSuccess: (paypalOrderId: string, transactionId: string) => void;

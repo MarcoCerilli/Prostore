@@ -118,9 +118,9 @@ enum orderStatus {
     CREATED
     PENDING_PAYMENT
     PAID
+    PROCESSING
     SHIPPED
     DELIVERED
-    PROCESSING
     CANCELLED
     
 }
@@ -129,6 +129,7 @@ model Order {
     id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
     orderNumber     String      @unique
     userId          String?     @db.Uuid
+    cartId          String?
     shippingAddress Json        @db.Json
     stripePaymentIntentId   String?       @unique(map: "order_stripePaymentIntentId_unique") 
     paymentmethod   String

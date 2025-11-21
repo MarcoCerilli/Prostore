@@ -11,6 +11,8 @@ import {
   CreditCard,
   Home,
   Tag,
+  AlertTriangle,
+  Loader,
 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
@@ -52,36 +54,46 @@ type OrderDetails = {
 };
 
 // --- MAPPA DELLO STATO ---
-const statusMap: Record<
-  OrderStatus,
-  { icon: any; color: string; text: string }
-> = {
-  PENDING_PAYMENT: {
-    icon: Clock,
-    color: "text-yellow-700 bg-yellow-100",
-    text: "In Attesa di Pagamento",
-  },
-  PAID: {
-    icon: Euro, // Usiamo Euro come icona di Pagato
-    color: "text-green-700 bg-green-200", 
-    text: "Pagato / In Elaborazione",
-  },
-  SHIPPED: {
-    icon: Package,
-    color: "text-blue-600 bg-blue-100",
-    text: "Spedito",
-  },
-  DELIVERED: {
-    icon: CheckCircle,
-    color: "text-lime-700 bg-lime-100", 
-    text: "Consegnato",
-  },
-  CANCELLED: {
-    icon: XCircle,
-    color: "text-red-600 bg-red-100",
-    text: "Annullato",
-  },
-};
+const statusMap = {
+    // 1. Aggiungi CREATED
+    CREATED: { icon: Clock, color: "text-gray-500 bg-gray-100", text: "Creato" },
+
+    // 2. Aggiungi PROCESSING
+    PROCESSING: {
+        icon: Loader,
+        color: "text-blue-700 bg-blue-100",
+        text: "In Lavorazione",
+    },
+    
+    PENDING_PAYMENT: {
+        icon: Clock,
+        color: "text-yellow-700 bg-yellow-100",
+        text: "In Attesa di Pagamento",
+    },
+    PAID: {
+        icon: Euro,
+        color: "text-green-700 bg-green-200",
+        text: "Pagato", // Ho semplificato il testo per chiarezza
+    },
+    SHIPPED: {
+        icon: Package,
+        color: "text-blue-600 bg-blue-100",
+        text: "Spedito",
+    },
+    DELIVERED: {
+        icon: CheckCircle,
+        color: "text-lime-700 bg-lime-100",
+        text: "Consegnato",
+    },
+    CANCELLED: {
+        icon: XCircle,
+        color: "text-red-600 bg-red-100",
+        text: "Annullato",
+    },
+// ⭐ APPLICA IL CASTING ALLA FINE DELL'OGGETTO
+// (Nota: Rimuovi l'annotazione di tipo esplicita dopo la dichiarazione `const statusMap =`)
+} as Record<OrderStatus, { icon: any; color: string; text: string }>;
+
 
 // --- COMPONENTE PAGE (Server Component) ---
 
@@ -104,8 +116,26 @@ export default async function OrderDetailsPage({ params }: OrderDetailsPageProps
     notFound();
   }
 
+
+
+
+// ⭐ Aggiungi questa definizione PRIMA di usare currentStatus
+const fallbackStatus = { 
+    color: "text-gray-700", // Colore di default per il testo
+    text: "Stato Sconosciuto", 
+    // Assicurati che qui ci sia l'icona di default che usi (ad esempio, AlertTriangle)
+    icon: AlertTriangle, 
+};
+
+
+
+
  // 3. Preparazione dei Dati per il Rendering
-    const currentStatus = statusMap[order.status as OrderStatus];
+const currentStatus = statusMap[order.status as OrderStatus]  || fallbackStatus;
+if (currentStatus === fallbackStatus) {
+    console.error(`Stato dell'ordine non mappato: ${order.status}`);
+    // Se stai usando un ambiente server/edge, questo log apparirà su Vercel.
+}
     const orderItems = order.OrderItem || []; // Dettagli degli articoli
 
 

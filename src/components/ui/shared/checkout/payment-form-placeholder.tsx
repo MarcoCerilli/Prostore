@@ -329,7 +329,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           <div className="flex justify-center w-full">
             <PayPalButtonComponent
                       orderId={cartId}
-                      // 🔑 Passaggio delle props di scomposizione in formato stringa
                       finalPrice={totalPrice.toFixed(2)}
                       itemsPrice={itemsPrice.toFixed(2)}
                       shippingPrice={shippingPrice.toFixed(2)}
