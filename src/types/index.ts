@@ -73,7 +73,6 @@ export const DEFAULT_PAYMENT_METHOD =
   process.env.DEFAULT_PAYMENT_METHOD || "Paypal";
 
 export type OrderStatus =
-  | "CREATED"
   | "PENDING_PAYMENT"
   | "PAID"
   | "SHIPPED"
