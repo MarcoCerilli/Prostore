@@ -14,11 +14,6 @@ type StatusConfig = {
 
 // Mappa lo stato dell'ordine ai colori Tailwind. 
 const statusMap = {
-    // STATI STANDARD
-    PENDING: {
-        text: "In Attesa",
-        className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-300",
-    },
     PROCESSING: {
         text: "In Lavorazione",
         className: "bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300",
