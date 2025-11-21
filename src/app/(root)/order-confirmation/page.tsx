@@ -66,7 +66,7 @@ export default async function OrderConfirmationPage({
     },
   })) as OrderWithDetails | null; // Asserzione del tipo per le relazioni
 
-  if (!order || !order.orderStatus) {
+  if (!order || !order.status) {
     // Se l'ordine non esiste o non è stato pagato (per sicurezza), reindirizza alla 404
     console.warn(
       `Ordine ${orderId} non trovato o non pagato al momento della conferma.`
