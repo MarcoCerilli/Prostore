@@ -1,5 +1,4 @@
 // Importa l'oggetto 'handlers' dal tuo file di configurazione principale (src/auth.ts).
-import { handlers } from "@/auth";
 import { authOptions } from "@/auth";
 import NextAuth from "next-auth";
 
