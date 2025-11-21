@@ -4,7 +4,6 @@ import { notFound, redirect } from 'next/navigation';
 import { finalizeOrder } from '@/lib/actions/cart.actions'; // La funzione che aggiorna l'ordine e svuota il carrello
 import { getMyCart } from '@/lib/actions/cart.queries';
 import { getOrderDetailsAction } from '@/lib/actions/user.actions';
-import { Cart } from '@/types'; // Assicurati di importare i tipi corretti
 
 interface OrderPageProps {
   params: { orderId: string }; // orderId sarà il tuo orderNumber (es. ORD-12345678)
