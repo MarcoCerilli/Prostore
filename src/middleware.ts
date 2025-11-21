@@ -22,7 +22,7 @@ export async function middleware(request: NextRequest) {
   // ------------------------------------
   const token = await edgeAuth(request);
 
-  const protectedPaths = ["/checkout", "/dashboard", "/profilo"];
+  const protectedPaths = ["/dashboard", "/profilo"];
   const currentPath = request.nextUrl.pathname;
   const isProtected = protectedPaths.some((path) =>
     currentPath.startsWith(path)

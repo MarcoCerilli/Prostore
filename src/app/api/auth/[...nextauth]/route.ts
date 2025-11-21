@@ -1,6 +1,11 @@
 // Importa l'oggetto 'handlers' dal tuo file di configurazione principale (src/auth.ts).
 import { handlers } from "@/auth";
+import { authOptions } from "@/auth";
+import NextAuth from "next-auth";
+
+
+const handler = NextAuth(authOptions as any)
 
 // Espone i metodi GET e POST che sono contenuti nell'oggetto handlers.
 // L'endpoint della sessione (session) utilizza il metodo GET.
-export const { GET, POST } = handlers;
+export {handler as GET, handler as POST }
