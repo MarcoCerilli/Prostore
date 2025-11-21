@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 // La risoluzione del path di next/navigation a volte fallisce in ambienti di simulazione.
 // Se l'errore persiste, è probabile che l'ambiente non supporti l'importazione.
 import { useSearchParams } from 'next/navigation'; 
-import { getPaymentIntentStatusAction } from '/src/lib/actions/user.actions'; // Percorso aggiustato per ambiente di compilazione Canvas
+import { getPaymentIntentStatusAction } from 'src/lib/actions/user.actions.ts'; // Percorso aggiustato per ambiente di compilazione Canvas
 
 // Icone Lucide per uno stile moderno
 import { CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
