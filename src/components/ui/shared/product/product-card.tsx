@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader } from "../../card";
 import Link from "next/link";
 import ProductPrice from "./product-price";
 import { Product } from "@/types";
+import Rating from "../../rating";
 
 const ProductCard = ({ product }: { product: Product }) => {
   // URL dell'immagine: usa la prima immagine O un placeholder se non esiste
@@ -29,8 +30,12 @@ const ProductCard = ({ product }: { product: Product }) => {
         <Link href={`/product/${product.slug}`}>
           <h2 className="h2 text-sm font-medium">{product.name}</h2>
         </Link>
-        <div className="flex-between gap-4">
-          <p>{product.rating} Stars</p>
+        <div className="flex justify-between items-center gap-4">
+         <Rating 
+                value={Number(product.rating) || 0} 
+                // Se hai il conteggio delle recensioni, aggiungilo qui:
+                // reviewCount={product.numReviews} 
+            />
           {product.stock > 0 ? (
             <ProductPrice value={Number(product.price)} className="text-500" />
           ) : (
