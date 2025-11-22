@@ -21,7 +21,7 @@ export default function AdminOverviewPage() {
         <div className="p-6 space-y-8">
             
             {/* Titolo Principale della Dashboard */}
-            <h1 className="text-3xl font-bold">Dashboard di Amministrazione 🚀</h1>
+            <h1 className="text-3xl font-bold">Dashboard di Amministrazione</h1>
 
             {/* 1. SEZIONE RIEPILOGO METRICHE (Cards) */}
             {/* OrderSummaryCards gestisce il layout 3-4 colonne */}
