@@ -265,8 +265,8 @@ export const insertOrderSchema = z.object({
   status: OrderStatusSchema.default("PENDING_PAYMENT"),
 
   // Manteniamo le date per la cronologia (utili per l'admin)
-  paidAt: z.date().nullable().optional(),
-  deliveredAt: z.date().nullable().optional(),
+  paidAt: z.date().nullable().optional().default(null),
+  deliveredAt: z.date().nullable().optional().default(null),
 
   shippingAddress: shippingAddressSchema,
 });

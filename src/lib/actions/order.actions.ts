@@ -5,7 +5,8 @@ import { auth } from "@/auth";
 import { orderStatus, Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 // Assicurati che questi percorsi import siano corretti nel tuo progetto
-import { OrderSummary, OrderItem } from "@/types/order"; 
+import { OrderSummary, OrderItem } from "@/types/order";
+import { sendPurchaseReceiptEmail } from "../email";
 
 // --- Tipizzazione per l'Aggiornamento Post-Stripe ---
 interface UpdateOrderAfterStripeParams {
@@ -23,27 +24,43 @@ interface CreateOrderParams {
   shippingPrice: number;
   taxPrice: number;
   // ❌ RIMOSSO: paymentmethod non serve qui, è impostato nel server
-  shippingAddress: Prisma.InputJsonValue; 
-  items: any[]; 
+  shippingAddress: Prisma.InputJsonValue;
+  items: any[];
 }
 
 // --- Tipo di Ritorno per createOrderAction ---
-export type CreateOrderResult = 
-  | { success: true; orderId: string; orderNumber: string; message: string; error?: undefined } 
-  | { success: false; error: string; orderId?: undefined; orderNumber?: undefined; message?: undefined; };
+export type CreateOrderResult =
+  | {
+      success: true;
+      orderId: string;
+      orderNumber: string;
+      message: string;
+      error?: undefined;
+    }
+  | {
+      success: false;
+      error: string;
+      orderId?: undefined;
+      orderNumber?: undefined;
+      message?: undefined;
+    };
 
 // =============================================================
 // ## 🔑 Server Action 0: ensureUserExistsAction
 // =============================================================
 
-export async function ensureUserExistsAction(): Promise<{ success: boolean, userId?: string, error?: string }> {
+export async function ensureUserExistsAction(): Promise<{
+  success: boolean;
+  userId?: string;
+  error?: string;
+}> {
   // Logica invariata, usata per garantire l'esistenza del record utente se loggato.
   const session = await auth();
 
   if (!session?.user?.email || !session.user.id) {
     return { success: false, error: "Dati di sessione mancanti." };
   }
-  
+
   const { id, name, email } = session.user;
 
   try {
@@ -59,7 +76,7 @@ export async function ensureUserExistsAction(): Promise<{ success: boolean, user
         email: email,
         role: "user",
       },
-      select: { id: true }
+      select: { id: true },
     });
 
     return { success: true, userId: dbUser.id };
@@ -68,7 +85,6 @@ export async function ensureUserExistsAction(): Promise<{ success: boolean, user
     return { success: false, error: "Impossibile sincronizzare l'utente." };
   }
 }
-
 
 // =============================================================
 // ## 🚀 Server Action 1: createOrderAction (MASTER FUNCTION)
@@ -99,19 +115,22 @@ export async function createOrderAction({
         },
       },
       select: { id: true, orderNumber: true, status: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     if (recentOrder) {
       const existingOrderNumber = recentOrder.orderNumber || recentOrder.id;
-      console.log(`♻️ Ordine già esistente trovato (${existingOrderNumber}) nello stato: ${recentOrder.status}. Riutilizzo ID.`);
+      console.log(
+        `♻️ Ordine già esistente trovato (${existingOrderNumber}) nello stato: ${recentOrder.status}. Riutilizzo ID.`
+      );
 
       // Se l'ordine esiste, dobbiamo assumere che il carrello sia già stato svuotato.
       // Se il carrello è già svuotato, questo riutilizzo è corretto.
-      
-      const message = recentOrder.status === 'PROCESSING' 
-        ? `Pagamento già completato. Visualizza Ordine ${existingOrderNumber}.`
-        : `Ordine ${existingOrderNumber} già in attesa. Riutilizza ID.`;
+
+      const message =
+        recentOrder.status === "PROCESSING"
+          ? `Pagamento già completato. Visualizza Ordine ${existingOrderNumber}.`
+          : `Ordine ${existingOrderNumber} già in attesa. Riutilizza ID.`;
 
       return {
         success: true,
@@ -123,11 +142,10 @@ export async function createOrderAction({
 
     // 2. Creazione Transazionale (Ordine + Items + Eliminazione Carrello)
     const newOrder = await prisma.$transaction(async (tx) => {
-
       // 2.1 Crea Ordine
       const createdOrder = await tx.order.create({
         data: {
-          userId: userId, 
+          userId: userId,
           cartId: cartId,
           totalPrice: new Decimal(totalPrice),
           itemsPrice: new Decimal(itemsPrice),
@@ -138,11 +156,11 @@ export async function createOrderAction({
           paymentmethod: "Stripe",
           orderNumber: `ORD-${Date.now()}`,
         },
-        select: { id: true, orderNumber: true }
+        select: { id: true, orderNumber: true },
       });
 
       // 2.2 Prepara gli Items
-      const orderItemsData = items.map(item => {
+      const orderItemsData = items.map((item) => {
         if (!item.productId) throw new Error(`Item "${item.name}" senza ID.`);
 
         return {
@@ -152,7 +170,7 @@ export async function createOrderAction({
           price: new Decimal(item.price),
           qty: item.quantity,
           image: item.image,
-          slug: item.slug ?? item.name.toLowerCase().replace(/\s+/g, '-'),
+          slug: item.slug ?? item.name.toLowerCase().replace(/\s+/g, "-"),
         };
       });
 
@@ -164,16 +182,18 @@ export async function createOrderAction({
       // 🔑 PASSO CRUCIALE: ELIMINA IL CARRELLO E I SUOI ARTICOLI DAL DB
       // Questo impedisce che `getMyCartAction` lo ricarichi.
       try {
-          // Questo elimina il carrello e, se hai `onDelete: Cascade`
-          // configurato nel tuo schema Prisma, elimina anche i CartItem associati.
-          await tx.cart.delete({
-              where: { id: cartId },
-          });
+        // Questo elimina il carrello e, se hai `onDelete: Cascade`
+        // configurato nel tuo schema Prisma, elimina anche i CartItem associati.
+        await tx.cart.delete({
+          where: { id: cartId },
+        });
       } catch (deleteError) {
-          console.warn(`ATTENZIONE: Errore nell'eliminazione del carrello (${cartId}). Potrebbe essere già stato eliminato o mancare la chiave.`, deleteError);
-          // Continua, non bloccare la transazione per un carrello mancante
+        console.warn(
+          `ATTENZIONE: Errore nell'eliminazione del carrello (${cartId}). Potrebbe essere già stato eliminato o mancare la chiave.`,
+          deleteError
+        );
+        // Continua, non bloccare la transazione per un carrello mancante
       }
-
 
       return createdOrder;
     });
@@ -189,11 +209,13 @@ export async function createOrderAction({
       orderNumber: newOrderNumber,
       message: `Ordine ${newOrderNumber} creato con successo. Procedi al pagamento.`,
     };
-
   } catch (error) {
     console.error("❌ ERRORE createOrderAction:", error);
-    if ((error as any).code === 'P2003') {
-      return { success: false, error: "Errore Utente: Fai logout e login per aggiornare il database." };
+    if ((error as any).code === "P2003") {
+      return {
+        success: false,
+        error: "Errore Utente: Fai logout e login per aggiornare il database.",
+      };
     }
     return { success: false, error: "Errore creazione ordine." };
   }
@@ -201,25 +223,68 @@ export async function createOrderAction({
 // -------------------------------------------------------------
 // ## ✅ Server Action 2: updateOrderAfterStripeSuccess
 // -------------------------------------------------------------
-
 export async function updateOrderAfterStripeSuccess({
   orderId,
   stripePaymentIntentId,
 }: UpdateOrderAfterStripeParams) {
-
   try {
-    console.log(`💳 Aggiornamento Ordine ${orderId} -> PAGATO (Stripe: ${stripePaymentIntentId})`);
-    
+    console.log(
+      `💳 Aggiornamento Ordine ${orderId} -> PAGATO (Stripe: ${stripePaymentIntentId})`
+    );
+
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
       data: {
-        isPaid: true, 
+        isPaid: true,
         paidAt: new Date(),
-        stripePaymentIntentId: stripePaymentIntentId, 
+        stripePaymentIntentId: stripePaymentIntentId,
         paymentmethod: "Carta di Credito (Stripe)",
-        status: orderStatus.PROCESSING,
+        // Lasciamo PROCESSING qui per coerenza con il flusso (se vuoi "PAID" modificalo)
+        status: orderStatus.PAID, 
+      },
+      include: {
+        user: { select: { email: true, name: true } },
+        OrderItem: true,
       },
     });
+
+    // 2. Mappatura e Conversione dei Dati
+    const orderForEmail = {
+      ...updatedOrder,
+      totalPrice: updatedOrder.totalPrice.toNumber(),
+      itemsPrice: updatedOrder.itemsPrice.toNumber(),
+      shippingPrice: updatedOrder.shippingPrice.toNumber(),
+      taxPrice: updatedOrder.taxPrice.toNumber(), 
+
+      // Mappa e coverti gli articoli
+      orderItems: updatedOrder.OrderItem.map((item) => ({
+        ...item,
+        price: item.price.toNumber(), // Decimal -> Number
+      })),
+
+      shippingAddress: updatedOrder.shippingAddress as any,
+    };
+
+    // 🛑 LOG DI VERIFICA DEI DATI UTENTE
+    console.log("Dati utente per Email:", {
+      email: orderForEmail.user?.email,
+      name: orderForEmail.user?.name,
+      totalPrice: orderForEmail.totalPrice,
+      itemCount: orderForEmail.orderItems.length,
+    });
+
+    // 3. 📧 INVIA L'EMAIL DI RICEVUTA (CORREZIONE CRITICA: USARE await)
+    try {
+      // 🔑 Passiamo l'oggetto orderForEmail all'interno di un oggetto { order: ... }
+      await sendPurchaseReceiptEmail({ order: orderForEmail as any });
+      console.log(`✅ Email ricevuta per Ordine ${orderId} inviata.`);
+    } catch (e) {
+      // Catturiamo solo l'errore di invio, senza bloccare l'aggiornamento DB
+      console.error("⚠️ Errore CRITICO nell'invio email DOPO il pagamento:", e);
+    }
+    
+    // 4. Svuotamento carrello e revalidate
+    // ... AGGIUNGI QUI LOGICA PER SVUOTARE CARRELLO E REVALIDATE ...
 
     return { success: true, orderId: updatedOrder.id };
   } catch (error) {
@@ -227,6 +292,7 @@ export async function updateOrderAfterStripeSuccess({
     return { success: false, error: "Aggiornamento stato pagamento fallito." };
   }
 }
+
 
 // -------------------------------------------------------------
 // ## ⭐ Server Action 3: getMyOrdersSummaryAction
@@ -248,19 +314,19 @@ export async function getMyOrdersSummaryAction(): Promise<OrderSummary[]> {
         totalPrice: true,
         status: true,
         // ✅ CORREZIONE: Includi la relazione 'user'
-        user: { 
+        user: {
           select: {
             name: true,
-          }
+          },
         },
         OrderItem: {
           select: {
-            productId: true, 
+            productId: true,
             name: true,
           },
         },
       },
-    }); 
+    });
 
     // Mappatura sicura per il frontend
     const sanitizedOrders: OrderSummary[] = orders.map((order) => ({
@@ -268,8 +334,8 @@ export async function getMyOrdersSummaryAction(): Promise<OrderSummary[]> {
       orderNumber: order.orderNumber,
       createdAt: order.createdAt,
       totalPrice: order.totalPrice.toNumber(),
-      status: order.status, 
-      user: order.user, 
+      status: order.status,
+      user: order.user,
       orderItems: order.OrderItem.map((item) => ({
         id: item.productId, // Usa productId come ID dell'item
         name: item.name,

@@ -87,6 +87,9 @@ export type Order = z.infer<typeof insertOrderSchema> & {
   status: OrderStatus;
   orderItems: OrderItem[];
   user: { name: string; email: string };
+  isPaid: Boolean;
+  paymentResult: paymentResult
+
 };
 // Tipo payload per la Server Action (Order creation)
 export interface CheckoutPayload {
