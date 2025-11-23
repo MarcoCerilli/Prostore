@@ -14,9 +14,7 @@ import {
   TableRow,
   TableCell, // Per l'intestazione se la usi
 } from "@/components/ui/table";
-import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export default async function MyOrdersPage() {
     // 1. Recupera i dati filtrati per l'utente loggato
