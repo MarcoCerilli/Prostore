@@ -53,34 +53,34 @@ const callbackUrl = urlParams.get('callbackUrl') ?? '/';
 
   // --- Rendering del Contenitore del Form ---
   return (
-    <div className="w-full max-w-md mx-auto">
-      <Card>
-        <CardHeader className="space-y-4">
-          {/* Logo/Nome App */}
-          <Link href="/" className="flex justify-center items-center">
-            {/* Se non hai ancora un logo, usa il nome dell'app come fallback testuale */}
-            {/* <Image
-               src="/images/logo.svg"
-               width={100}
-               height={100}
-               alt={`${APP_NAME}`}
-             /> */}
-            <span className="text-2xl font-bold">{APP_NAME || "ProStore"}</span>
-          </Link>
+    <div className="flex items-center justify-center min-h-screen p-4 bg-gray-50"> 
+  
+  {/* Questo div è il tuo container originale, ora centrato dal genitore */}
+  <div className="w-full max-w-md"> 
+    
+    <Card>
+      <CardHeader className="space-y-4">
+        {/* Logo/Nome App */}
+        <Link href="/" className="flex justify-center items-center">
+          {/* Se non hai ancora un logo, usa il nome dell'app come fallback testuale */}
+          <span className="text-2xl font-bold">{APP_NAME || "ProStore"}</span>
+        </Link>
 
-          <CardTitle className="text-center">Crea un Account</CardTitle>
-          <CardDescription className="text-center">
-            Registrati per accedere a tutte le funzionalità.
-          </CardDescription>
-        </CardHeader>
-        
-        {/* CardContent contiene solo il form */}
-        <CardContent className="space-y-4">
-            {/* 3. Inietta il Client Component del Form, passandogli l'URL di callback */}
-            <CredentialsSignUpForm callbackUrl={callbackUrl} />
-        </CardContent>
-      </Card>
-    </div>
+        <CardTitle className="text-center">Crea un Account</CardTitle>
+        <CardDescription className="text-center">
+          Registrati per accedere a tutte le funzionalità.
+        </CardDescription>
+      </CardHeader>
+      
+      {/* CardContent contiene solo il form */}
+      <CardContent className="space-y-4">
+        {/* 3. Inietta il Client Component del Form, passandogli l'URL di callback */}
+        <CredentialsSignUpForm callbackUrl={callbackUrl} />
+      </CardContent>
+    </Card>
+    
+  </div>
+</div>
   );
 };
 

@@ -59,28 +59,30 @@ const SignInPage = async ({
 
   // 4. Se la sessione NON esiste (utente disconnesso), mostra il form.
   return (
-    <div className="w-full max-w-md mx-auto pt-8">
-      <Card>
-        <CardHeader className=" space-y-4">
-          <Link href="/" className="flex-center">
-            <Image
-              src="/images/logo.svg"
-              width={100}
-              height={100}
-              alt={`${APP_NAME}`}
-            />
-          </Link>
-          <CardTitle className="text-center">Accesso</CardTitle>
-          <CardDescription className="text-center">
-            Accedi al tuo account
-          </CardDescription>
-        </CardHeader>
-        {/* Passa il valore di fallback. La lettura reale avverrà nel Client Component. */}
-        <CardContent className="space-y-4">
-          <CredentialsSignInform callbackUrl="/" /> 
-        </CardContent>
-      </Card>
-    </div>
+   <div className="flex items-center justify-center min-h-screen p-4 bg-gray-50"> 
+  {/* Aggiunta di bg-gray-50 per un migliore contrasto visivo */}
+  <div className="w-full max-w-md">
+    <Card>
+      <CardHeader className=" space-y-4">
+        <Link href="/" className="flex-center">
+          <Image
+            src="/images/logo.svg"
+            width={100}
+            height={100}
+            alt={`${APP_NAME}`}
+          />
+        </Link>
+        <CardTitle className="text-center">Accesso</CardTitle>
+        <CardDescription className="text-center">
+          Accedi al tuo account
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <CredentialsSignInform callbackUrl="/" /> 
+      </CardContent>
+    </Card>
+  </div>
+</div>
   );
 };
 
