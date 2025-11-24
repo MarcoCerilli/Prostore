@@ -36,7 +36,7 @@ const Homepage = async () => {
     return (
       <div className="wrapper">
         <h1 className="h1-bold text-center mt-10 mb-8">
-          Benvenuto su ProStore
+          Benvenuto su ModernStore
         </h1>
         <div className="text-center mt-20 text-gray-500">
           Al momento non sono disponibili prodotti in vetrina o nuovi arrivi.

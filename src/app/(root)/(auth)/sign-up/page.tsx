@@ -63,7 +63,7 @@ const callbackUrl = urlParams.get('callbackUrl') ?? '/';
         {/* Logo/Nome App */}
         <Link href="/" className="flex justify-center items-center">
           {/* Se non hai ancora un logo, usa il nome dell'app come fallback testuale */}
-          <span className="text-2xl font-bold">{APP_NAME || "ProStore"}</span>
+          <span className="text-2xl font-bold">{APP_NAME || "ModernStore"}</span>
         </Link>
 
         <CardTitle className="text-center">Crea un Account</CardTitle>
