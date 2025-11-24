@@ -128,17 +128,19 @@ const AddToCart = ({
         // Aggiunta iniziale: mostriamo il pulsante VAI AL CARRELLO
         toast({
           description: `${item.name} aggiunto al carrello.`,
-          action: (
-            <ToastAction // 🎨 Stile NERO unificato
-             className="bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg font-semibold px-3 py-1"
-              altText="Vai al carrello"
-              onClick={() => router.push("/cart")}
-            >
-                            <ShoppingCart className="h-4 w-4 mr-1" /> Vai al
-              Carrello            {" "}
-            </ToastAction>
-          ),
-          duration: 8000,
+          action: ( // 🎨 Stile NERO unificato
+        <ToastAction
+          className="bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg font-semibold px-3 py-1"
+          altText="Vai al carrello"
+          onClick={() => router.push("/cart")}
+        >
+          {/* Assicurati che il contenitore del testo sia pulito */}
+          <div className="flex items-center">
+             <ShoppingCart className="h-4 w-4 mr-1" /> Vai al Carrello 
+          </div>
+        </ToastAction>
+      ),
+      duration: 4000,
         });
       } else {
         // Incremento/Decremento: mostriamo solo la notifica di aggiornamento

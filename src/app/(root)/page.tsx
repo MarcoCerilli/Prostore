@@ -49,7 +49,7 @@ const Homepage = async () => {
   // 5. Renderizzazione finale
   return (
     <div className="wrapper">
-            <h1 className="h1-bold text-center mt-10 mb-8">Benvenuto su ProStore</h1>
+            <h1 className="h1-bold text-center mt-10 mb-8">Benvenuto su ModernStore</h1>
 
             {/* Mostra il Carousel solo se ci sono prodotti in vetrina */}
             {featuredProducts.length > 0 && <ProductCarousel data={featuredProducts} />}
