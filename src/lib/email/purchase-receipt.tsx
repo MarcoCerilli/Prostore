@@ -178,7 +178,7 @@ export default function PurchaseReceiptEmail({ order }: OrderInformationProps) {
                                             className="rounded"
                                             src={
                                                 item.image.startsWith("/")
-                                                    ? `${process.env.NEXT_PUBLIC_SERVER_URL}${item.image}` // Logica definitiva per Vercel
+                                                    ? `${process.env.SERVER_URL}${item.image}` // Logica definitiva per Vercel
                                                     : item.image 
                                             }
                                         />

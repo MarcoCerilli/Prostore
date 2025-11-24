@@ -136,7 +136,7 @@ const AddToCart = ({
         >
           {/* Assicurati che il contenitore del testo sia pulito */}
           <div className="flex items-center">
-             <ShoppingCart className="h-4 w-4 mr-1" /> Vai al Carrello 
+             <ShoppingCart className="h-4 w-4" /> Vai al Carrello 
           </div>
         </ToastAction>
       ),
