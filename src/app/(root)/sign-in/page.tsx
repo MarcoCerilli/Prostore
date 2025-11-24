@@ -59,7 +59,7 @@ const SignInPage = async ({
 
   // 4. Se la sessione NON esiste (utente disconnesso), mostra il form.
   return (
-    <div className="w-full max-w-md mx-auto">
+    <div className="w-full max-w-md mx-auto pt-8">
       <Card>
         <CardHeader className=" space-y-4">
           <Link href="/" className="flex-center">
