@@ -215,7 +215,7 @@ export default function CheckoutClientWrapper({
     });
     
     // Reindirizzamento alla dashboard ordini (o pagina di conferma specifica)
-    router.push("/admin/orders"); 
+    router.push("/dashboard/admin/orders"); 
   }, [router, toast]);
 
 

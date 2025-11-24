@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 
 // --- Inizializzazione ---
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  // Usa la versione API più recente o quella che stai usando
   apiVersion: "2024-06-20" as Stripe.LatestApiVersion,
 });
 
@@ -43,18 +42,20 @@ export async function POST(req: NextRequest) {
 
     const incompletePaymentIntent = event.data.object as Stripe.PaymentIntent;
 
-    // --- CORREZIONE DEL TIPO E RECUPERO ---
-    // Usiamo 'as any' per risolvere l'errore del compilatore sulla proprietà 'charges' espansa
+    // Recuperiamo il Payment Intent con i dettagli del charge
     const paymentIntent = (await stripe.paymentIntents.retrieve(
       incompletePaymentIntent.id,
       {
         expand: ["charges"],
       }
     )) as any;
-    // --- FINE CORREZIONE ---
+
+    // 🔑 LOG CRITICO: Verifichiamo quale ID stiamo cercando
+    console.log(`[Stripe Webhook] Ricevuto 'payment_intent.succeeded' per PI ID: ${paymentIntent.id}`);
+
 
     // --- Determinazione del Metodo di Pagamento ---
-    let paymentMethod = "Stripe";
+    let paymentMethod = "Stripe Card";
 
     if (paymentIntent.charges && paymentIntent.charges.data.length > 0) {
       const charge = paymentIntent.charges.data[0];
@@ -63,9 +64,9 @@ export async function POST(req: NextRequest) {
         const methodType = charge.payment_method_details.type;
 
         if (methodType === "paypal") {
-          paymentMethod = "PayPal";
+          // Questo identifica il PayPal integrato in Stripe
+          paymentMethod = "PayPal (via Stripe)"; 
         } else if (methodType === "card") {
-          // Aggiungiamo il brand della carta
           paymentMethod = `Carta (${charge.payment_method_details.card?.brand || "sconosciuta"})`;
         } else {
           paymentMethod =
@@ -73,13 +74,12 @@ export async function POST(req: NextRequest) {
         }
       }
     }
-    console.log(`[Webhook] Metodo di pagamento rilevato: ${paymentMethod}`);
+    console.log(`[Stripe Webhook] Metodo di pagamento rilevato: ${paymentMethod}`);
     // --- Fine Determinazione Metodo ---
 
     // Trova l'ordine associato all'ID del Payment Intent
     const order = await prisma.order.findUnique({
       where: { stripePaymentIntentId: paymentIntent.id },
-      // Aggiunto 'status' per il controllo di doppia esecuzione
       select: {
         id: true,
         userId: true,
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (order?.id) {
-      // 🔑 CORREZIONE: Prevenire la doppia esecuzione del webhook
+      // 🔑 Preveniamo la doppia esecuzione del webhook
       if (order.status === "PAID") {
         console.log(`⚠️ Ordine ${order.id} già PAGATO. Webhook ignorato.`);
         return new NextResponse(
@@ -106,24 +106,21 @@ export async function POST(req: NextRequest) {
           status: "PAID",
           isPaid: true,
           paidAt: new Date(),
-          paymentmethod: paymentMethod,
+          paymentmethod: paymentMethod, // Usa il metodo di pagamento rilevato
         },
       });
 
       // --- 2b. Svuotamento Carrello (come richiesto) ---
-      if (order.userId) {
-        await prisma.cart.deleteMany({ where: { userId: order.userId } });
-        console.log(`✅ Carrello svuotato per utente loggato: ${order.userId}`);
-      } else if (order.cartId) {
-        await prisma.cart.deleteMany({ where: { id: order.cartId } });
-        console.log(
-          `✅ Carrello svuotato per guest/fallback (Cart ID: ${order.cartId})`
-        );
+      // Logica semplificata per chiarezza, il tuo codice è già corretto
+      const targetId = order.userId ? { userId: order.userId } : order.cartId ? { id: order.cartId } : null;
+      
+      if (targetId) {
+        await prisma.cart.deleteMany({ where: targetId });
+        console.log(`✅ Carrello svuotato.`);
       } else {
-        console.warn(
-          `⚠️ Impossibile svuotare il carrello: Ordine ${order.id} non ha né userId né cartId.`
-        );
+        console.warn(`⚠️ Impossibile svuotare il carrello.`);
       }
+
 
       // --- 2c. Invalidazione Cache (Next.js Revalidation) ---
       revalidatePath(`/cart`);
@@ -135,10 +132,15 @@ export async function POST(req: NextRequest) {
       }
 
       console.log(
-        `✅ Ordine ${order.id} aggiornato a PAGATO e cache rigenerata.`
+        `✅ Ordine ${order.id} (n. ${order.orderNumber}) aggiornato a PAGATO e cache rigenerata.`
       );
     } else {
-      console.error(`❌ Ordine non trovato per PI ID: ${paymentIntent.id}.`);
+      // ❌ MESSAGGIO DI ERRORE DETTAGLIATO
+      console.error(`
+        ❌ Ordine non trovato per PI ID: ${paymentIntent.id}. 
+        Controlla che l'ID sia stato salvato nell'ordine al momento della creazione
+        (campo 'stripePaymentIntentId' in Prisma).
+      `);
     }
 
     // Risposta finale di successo a Stripe (dopo l'elaborazione)
