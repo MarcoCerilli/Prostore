@@ -19,7 +19,7 @@ export async function getMyOrdersSummaryAction(): Promise<OrderSummary[]> {
     const userId = session?.user.id;
 
     if (!userId) {
-        redirect("/login");
+        redirect("/sign-in");
     }
 
     try {

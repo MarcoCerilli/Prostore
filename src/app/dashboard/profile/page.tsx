@@ -14,7 +14,7 @@ export default async function ProfilePage() {
 
     // 2. CONTROLLO DI AUTENTICAZIONE (basato sul risultato del DB/sessione)
     if (!user) {
-        redirect('/login');
+        redirect('/sign-in');
     }
     
 
