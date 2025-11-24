@@ -112,4 +112,5 @@ const nextAuthInstance = NextAuth(authOptions as any);
 export const handlers = nextAuthInstance.handlers;
 
 // 🛑 CORREZIONE QUI: Rimuovi 'auth' dalla destrutturazione
-export const { signIn, signOut, auth } = nextAuthInstance;
+export const { signIn, signOut } = nextAuthInstance;
+export const { auth } = nextAuthInstance; // La funzione 'auth' è trattata separatamente
