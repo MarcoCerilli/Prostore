@@ -4,7 +4,6 @@ import prisma from "@/db/prisma";
 import { auth } from "@/auth";
 import { orderStatus, Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
-// Assicurati che questi percorsi import siano corretti nel tuo progetto
 import { OrderSummary, OrderItem } from "@/types/order";
 import { sendPurchaseReceiptEmail } from "../email";
 
@@ -23,7 +22,7 @@ interface CreateOrderParams {
   itemsPrice: number;
   shippingPrice: number;
   taxPrice: number;
-  // ❌ RIMOSSO: paymentmethod non serve qui, è impostato nel server
+  paymentMethod?: string;
   shippingAddress: Prisma.InputJsonValue;
   items: any[];
 }
@@ -98,6 +97,7 @@ export async function createOrderAction({
   taxPrice,
   shippingAddress,
   items,
+  paymentMethod = "Stripe",
 }: CreateOrderParams): Promise<CreateOrderResult> {
   // console.log(`SERVER ACTION: Creazione ordine User: ${userId || 'GUEST'} - Carrello: ${cartId}`);
 
@@ -106,6 +106,7 @@ export async function createOrderAction({
   }
 
   try {
+    // 1. Logica Anti-Duplicazione / Riutilizzo
     const recentOrder = await prisma.order.findFirst({
       where: {
         cartId: cartId, // Usa l'ID del carrello come chiave unica
@@ -114,23 +115,110 @@ export async function createOrderAction({
           gt: new Date(Date.now() - 30 * 1000),
         },
       },
-      select: { id: true, orderNumber: true, status: true },
+      // ✅ CORREZIONE: Includo paymentmethod nella selezione per evitare l'errore
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        paymentmethod: true,
+      },
       orderBy: { createdAt: "desc" },
     });
 
     if (recentOrder) {
       const existingOrderNumber = recentOrder.orderNumber || recentOrder.id;
+
+      let updatedStatus = recentOrder.status;
+      let updatedPaymentMethod = recentOrder.paymentmethod;
+
+      // Contrassegno: Forzo lo stato a PROCESSING e aggiorno il metodo di pagamento se necessario
+      if (
+        paymentMethod === "Contrassegno" &&
+        // Aggiorno se non è già PROCESSING O il metodo di pagamento è sbagliato
+        (recentOrder.status !== orderStatus.PROCESSING ||
+          recentOrder.paymentmethod !== paymentMethod)
+      ) {
+        console.log(
+          `🔄 Aggiornamento stato Ordine riutilizzato ${existingOrderNumber} a PROCESSING (Contrassegno).`
+        );
+
+        await prisma.order.update({
+          where: { id: recentOrder.id },
+          data: {
+            status: orderStatus.PROCESSING,
+            paymentmethod: paymentMethod,
+          },
+        });
+
+        updatedStatus = orderStatus.PROCESSING;
+        updatedPaymentMethod = paymentMethod;
+
+        // 🎯 INIZIO CORREZIONE: LOGICA EMAIL PER ORDINE RIUTILIZZATO
+        // Questa parte è cruciale per catturare il tuo scenario di test!
+
+        // 1. Carichiamo l'ordine completo per l'email (usando recentOrder.id)
+        const fullOrder = await prisma.order.findUnique({
+          where: { id: recentOrder.id }, // Usa l'ID dell'ordine riutilizzato
+          include: {
+            user: { select: { email: true, name: true } },
+            OrderItem: true,
+          },
+        });
+
+        if (
+          fullOrder &&
+          fullOrder.user?.email &&
+          fullOrder.OrderItem.length > 0
+        ) {
+          // 2. Mappatura necessaria per convertire Decimal in Number per il template
+          const orderForEmail = {
+            ...fullOrder,
+            totalPrice: fullOrder.totalPrice.toNumber(),
+            itemsPrice: fullOrder.itemsPrice.toNumber(),
+            shippingPrice: fullOrder.shippingPrice.toNumber(),
+            taxPrice: fullOrder.taxPrice.toNumber(),
+            orderItems: fullOrder.OrderItem.map((item) => ({
+              ...item,
+              price: item.price.toNumber(),
+            })),
+            shippingAddress: fullOrder.shippingAddress as any,
+          };
+
+          try {
+            // 3. Invio Email
+            await sendPurchaseReceiptEmail({ order: orderForEmail as any });
+            console.log(
+              `✅ Email Contrassegno (riutilizzo) inviata per ordine ${recentOrder.id}`
+            );
+          } catch (e) {
+            console.error(
+              "⚠️ Errore invio email Contrassegno (riutilizzo):",
+              e
+            );
+          }
+        } else {
+          console.log(
+            "⚠️ Email Contrassegno NON INVIATA (riutilizzo): Dati mancanti (Ordine, Email Utente, o Articoli nell'Ordine).",
+            {
+              hasOrder: !!fullOrder,
+              hasEmail: !!fullOrder?.user?.email,
+              itemCount: fullOrder?.OrderItem.length,
+            }
+          );
+        }
+        // 🎯 FINE CORREZIONE
+      }
+
       console.log(
-        `♻️ Ordine già esistente trovato (${existingOrderNumber}) nello stato: ${recentOrder.status}. Riutilizzo ID.`
+        `♻️ Ordine già esistente trovato (${existingOrderNumber}) nello stato: ${updatedStatus}. Riutilizzo ID.`
       );
 
-      // Se l'ordine esiste, dobbiamo assumere che il carrello sia già stato svuotato.
-      // Se il carrello è già svuotato, questo riutilizzo è corretto.
-
+      // Usiamo updatedStatus per un messaggio più accurato per il Contrassegno
       const message =
-        recentOrder.status === "PROCESSING"
-          ? `Pagamento già completato. Visualizza Ordine ${existingOrderNumber}.`
-          : `Ordine ${existingOrderNumber} già in attesa. Riutilizza ID.`;
+        updatedPaymentMethod === "Contrassegno" &&
+        updatedStatus === orderStatus.PROCESSING
+          ? `Ordine Contrassegno ${existingOrderNumber} confermato e in lavorazione.`
+          : `Ordine ${existingOrderNumber} già in attesa di pagamento. Riutilizza ID.`; // Messaggio generico per Stripe/PENDING
 
       return {
         success: true,
@@ -151,9 +239,13 @@ export async function createOrderAction({
           itemsPrice: new Decimal(itemsPrice),
           shippingPrice: new Decimal(shippingPrice),
           taxPrice: new Decimal(taxPrice),
-          status: orderStatus.PENDING_PAYMENT,
+          status:
+            // ✅ CORRETTO: Contrassegno va in PROCESSING, altri (Stripe) in PENDING
+            paymentMethod === "Contrassegno"
+              ? orderStatus.PROCESSING
+              : orderStatus.PENDING_PAYMENT,
           shippingAddress: shippingAddress,
-          paymentmethod: "Stripe",
+          paymentmethod: paymentMethod,
           orderNumber: `ORD-${Date.now()}`,
         },
         select: { id: true, orderNumber: true },
@@ -180,10 +272,7 @@ export async function createOrderAction({
       }
 
       // 🔑 PASSO CRUCIALE: ELIMINA IL CARRELLO E I SUOI ARTICOLI DAL DB
-      // Questo impedisce che `getMyCartAction` lo ricarichi.
       try {
-        // Questo elimina il carrello e, se hai `onDelete: Cascade`
-        // configurato nel tuo schema Prisma, elimina anche i CartItem associati.
         await tx.cart.delete({
           where: { id: cartId },
         });
@@ -203,11 +292,70 @@ export async function createOrderAction({
 
     console.log(`✅ NUOVO Ordine creato: ${newOrder.id} (${newOrderNumber})`);
 
+    // Gestione email per Contrassegno
+    if (paymentMethod === "Contrassegno") {
+      // 1. Carichiamo l'ordine completo per l'email
+      const fullOrder = await prisma.order.findUnique({
+        where: { id: newOrder.id },
+        include: {
+          user: { select: { email: true, name: true } },
+          OrderItem: true,
+        },
+      });
+
+      if (
+        fullOrder &&
+        fullOrder.user?.email &&
+        fullOrder.OrderItem.length > 0
+      ) {
+        // 👈 AGGIUNTO IL CONTROLLO
+        //2. Mappatura necessaria per convertire Decimal in Number per il template
+        const orderForEmail = {
+          ...fullOrder,
+          totalPrice: fullOrder.totalPrice.toNumber(),
+          itemsPrice: fullOrder.itemsPrice.toNumber(),
+          shippingPrice: fullOrder.shippingPrice.toNumber(),
+          taxPrice: fullOrder.taxPrice.toNumber(),
+          orderItems: fullOrder.OrderItem.map((item) => ({
+            ...item,
+            price: item.price.toNumber(),
+          })),
+          shippingAddress: fullOrder.shippingAddress as any,
+        };
+
+        try {
+          // 3. Invio Email
+          await sendPurchaseReceiptEmail({ order: orderForEmail as any });
+          console.log(
+            `✅ Email Contrassegno inviata per ordine ${newOrder.id}`
+          );
+        } catch (e) {
+          console.error("⚠️ Errore invio email Contrassegno:", e);
+        }
+      } else {
+        // 🎯 Nuovo log per debug
+        console.log(
+          "⚠️ Email Contrassegno NON INVIATA: Dati mancanti (Ordine, Email Utente, o Articoli nell'Ordine).",
+          {
+            hasOrder: !!fullOrder,
+            hasEmail: !!fullOrder?.user?.email,
+            itemCount: fullOrder?.OrderItem.length,
+          }
+        );
+      }
+    }
+
+    // 🎯 Messaggio finale dinamico
+    const finalMessage =
+      paymentMethod === "Contrassegno"
+        ? `Ordine ${newOrderNumber} confermato e in lavorazione. Pagherai alla consegna.`
+        : `Ordine ${newOrderNumber} creato con successo. Procedi al pagamento.`;
+
     return {
       success: true,
       orderId: newOrder.id,
       orderNumber: newOrderNumber,
-      message: `Ordine ${newOrderNumber} creato con successo. Procedi al pagamento.`,
+      message: finalMessage, // ✅ Usa il messaggio dinamico corretto
     };
   } catch (error) {
     console.error("❌ ERRORE createOrderAction:", error);
@@ -220,6 +368,7 @@ export async function createOrderAction({
     return { success: false, error: "Errore creazione ordine." };
   }
 }
+
 // -------------------------------------------------------------
 // ## ✅ Server Action 2: updateOrderAfterStripeSuccess
 // -------------------------------------------------------------
@@ -240,7 +389,7 @@ export async function updateOrderAfterStripeSuccess({
         stripePaymentIntentId: stripePaymentIntentId,
         paymentmethod: "Carta di Credito (Stripe)",
         // Lasciamo PROCESSING qui per coerenza con il flusso (se vuoi "PAID" modificalo)
-        status: orderStatus.PAID, 
+        status: orderStatus.PAID,
       },
       include: {
         user: { select: { email: true, name: true } },
@@ -254,7 +403,7 @@ export async function updateOrderAfterStripeSuccess({
       totalPrice: updatedOrder.totalPrice.toNumber(),
       itemsPrice: updatedOrder.itemsPrice.toNumber(),
       shippingPrice: updatedOrder.shippingPrice.toNumber(),
-      taxPrice: updatedOrder.taxPrice.toNumber(), 
+      taxPrice: updatedOrder.taxPrice.toNumber(),
 
       // Mappa e coverti gli articoli
       orderItems: updatedOrder.OrderItem.map((item) => ({
@@ -282,7 +431,7 @@ export async function updateOrderAfterStripeSuccess({
       // Catturiamo solo l'errore di invio, senza bloccare l'aggiornamento DB
       console.error("⚠️ Errore CRITICO nell'invio email DOPO il pagamento:", e);
     }
-    
+
     // 4. Svuotamento carrello e revalidate
     // ... AGGIUNGI QUI LOGICA PER SVUOTARE CARRELLO E REVALIDATE ...
 
@@ -293,6 +442,63 @@ export async function updateOrderAfterStripeSuccess({
   }
 }
 
+// =============================================================
+// ## 3. updateOrderAfterPayPalSuccess (QUELLA CHE MANCAVA!) 🅿️
+// =============================================================
+export async function updateOrderAfterPayPalSuccess(
+  orderId: string,
+  paypalTransactionId: string
+) {
+  try {
+    console.log(
+      `🅿️ Aggiornamento PayPal Ordine ${orderId} -> PAGATO (Tx: ${paypalTransactionId})`
+    );
+
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        isPaid: true,
+        paidAt: new Date(),
+        paymentmethod: "PayPal",
+        // Salviamo l'ID transazione di PayPal nel campo stripePaymentIntentId
+        // (o in un campo dedicato se lo hai aggiunto al DB, es. paypalOrderId)
+        stripePaymentIntentId: paypalTransactionId,
+        status: orderStatus.PAID,
+      },
+      include: {
+        user: { select: { email: true, name: true } },
+        OrderItem: true,
+      },
+    });
+
+    // Preparazione dati Email
+    const orderForEmail = {
+      ...updatedOrder,
+      totalPrice: updatedOrder.totalPrice.toNumber(),
+      itemsPrice: updatedOrder.itemsPrice.toNumber(),
+      shippingPrice: updatedOrder.shippingPrice.toNumber(),
+      taxPrice: updatedOrder.taxPrice.toNumber(),
+      orderItems: updatedOrder.OrderItem.map((item) => ({
+        ...item,
+        price: item.price.toNumber(),
+      })),
+      shippingAddress: updatedOrder.shippingAddress as any,
+    };
+
+    // Invio Email
+    try {
+      await sendPurchaseReceiptEmail({ order: orderForEmail as any });
+      console.log(`✅ Email PayPal inviata per ordine ${orderId}`);
+    } catch (e) {
+      console.error("⚠️ Errore invio email PayPal:", e);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("❌ ERRORE updateOrderAfterPayPalSuccess:", error);
+    return { success: false, error: "Aggiornamento PayPal fallito." };
+  }
+}
 
 // -------------------------------------------------------------
 // ## ⭐ Server Action 3: getMyOrdersSummaryAction

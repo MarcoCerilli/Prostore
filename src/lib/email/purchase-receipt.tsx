@@ -87,6 +87,17 @@ type OrderInformationProps = {
 
 export default function PurchaseReceiptEmail({ order }: OrderInformationProps) {
     const userName = order.user?.name ?? 'Cliente'; 
+    
+    // 1. VARIABILI: Determina il messaggio dinamico
+    const paymentMethodText = order.paymentMethod === 'Contrassegno' 
+        ? 'Contrassegno' 
+        : order.paymentMethod;
+
+    const paymentStatusMessage = order.paymentMethod === 'Contrassegno'
+        ? "Non è richiesto alcun pagamento immediato. Ti preghiamo di preparare l'importo totale in contanti al momento della consegna."
+        : order.isPaid 
+            ? "Il pagamento è stato elaborato con successo e l'ordine è in preparazione."
+            : "L'ordine è stato creato in attesa di pagamento."; // Per Stripe/altri metodi in attesa
 
     return (
         <Html>
@@ -120,6 +131,15 @@ export default function PurchaseReceiptEmail({ order }: OrderInformationProps) {
                                         {dateFormatter.format(order.createdAt)}
                                     </Text>
                                 </Column>
+                                {/* 2. AGGIUNTA: Metodo di Pagamento */}
+                                <Column>
+                                    <Text className="mb-0 text-sm font-semibold text-gray-500 whitespace-nowrap text-nowrap">
+                                        Metodo
+                                    </Text>
+                                    <Text className="mb-0 text-indigo-700 text-lg">
+                                        {paymentMethodText}
+                                    </Text>
+                                </Column>
                                 <Column>
                                     <Text className="mb-0 text-sm font-semibold text-gray-500 whitespace-nowrap text-nowrap">
                                         Totale
@@ -129,6 +149,16 @@ export default function PurchaseReceiptEmail({ order }: OrderInformationProps) {
                                     </Text>
                                 </Column>
                             </Row>
+                        </Section>
+                        
+                        {/* 3. AGGIUNTA: Sezione Stato Pagamento (Messaggio Dinamico) */}
+                        <Section className={`p-4 rounded-lg text-center ${order.paymentMethod === 'Contrassegno' ? 'bg-yellow-100 border border-yellow-300' : 'bg-green-100 border border-green-300'}`}>
+                            <Text className="text-lg font-semibold m-0 text-gray-800">
+                                Stato Pagamento: {order.paymentMethod === 'Contrassegno' ? 'Da Pagare alla Consegna' : order.isPaid ? 'Pagato' : 'In Attesa di Pagamento'}
+                            </Text>
+                            <Text className="text-sm m-0 text-gray-600">
+                                {paymentStatusMessage}
+                            </Text>
                         </Section>
 
                         <Text className="text-xl font-semibold mt-8 mb-4">Dettagli Ordine</Text>

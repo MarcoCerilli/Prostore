@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react"; 
-import { CheckoutPayload, CartItemFrontend, shippingAddress } from "@/types";
+import { CartItemFrontend, shippingAddress } from "@/types";
 import { PaymentDetails } from "./payment-form-placeholder";
 import StripePaymentComponent from "@/components/order/StripePaymentComponent";
 import PayPalButtonComponent from "@/components/order/PaypalButtonComponent";
@@ -10,18 +10,14 @@ import { Label } from "@/components/ui/label";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "../../button";
-// Importazione della Server Action per la creazione dell'ordine
 import { createOrderAction } from "@/lib/actions/order.actions";
-// Importazione del Server Action per Stripe (che ora deve accettare baseUrl)
-// Non è necessario importarla qui per il funzionamento, ma solo per promemoria
+import {  updateOrderAfterPayPalSuccess } from "@/lib/actions/order.actions";
 
-// Definizioni delle Props
 interface PaymentStepProps {
   onSave: (details: PaymentDetails) => void;
-  // 🔑 NECESSARIO per notificare il successo al genitore e svuotare il carrello
-  onPaymentSuccess:() => void; 
+  onPaymentSuccess: () => void; 
   totalPrice: number;
-  cartId: string; // ID del carrello (chiave per il reset)
+  cartId: string;
   items: CartItemFrontend[];
   userId: string | null | undefined;
   shippingAddress: shippingAddress;
@@ -34,7 +30,7 @@ interface PaymentStepProps {
 
 export default function PaymentStep({
   onSave,
-  onPaymentSuccess, // 🔑 Aggiunto e destrutturato qui
+  onPaymentSuccess,
   totalPrice,
   cartId,
   items,
@@ -47,48 +43,25 @@ export default function PaymentStep({
   taxPrice,
 }: PaymentStepProps) {
   
-  const [selectedMethod, setSelectedMethod] = useState<string>(
-    "Carta di Credito / Debito"
-  );
-  
-  const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(
-    null
-  );
-  // 🔑 STATO PRINCIPALE: L'UUID dell'ordine nel DB (null finché non viene creato)
+  const [selectedMethod, setSelectedMethod] = useState<string>("Carta di Credito / Debito");
+  const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
-  // 🔑 CRUCIALE: Blocco per la creazione dell'ordine (previene doppi ordini)
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
-  // Stato per il caricamento del Client Secret di Stripe
   const [isLoadingSecret, setIsLoadingSecret] = useState(false);
-  // 🆕 CRUCIALE: Flag che indica se l'inizializzazione Stripe è già stata tentata per il carrello corrente
   const [hasStripeInitialized, setHasStripeInitialized] = useState(false); 
 
   const { toast } = useToast();
 
-  // ----------------------------------------------------------------------
-  // 🔑 LOGICA 1: Funzione Imperativa per la richiesta del Client Secret (chiamata solo dopo la creazione dell'ordine)
-  // ----------------------------------------------------------------------
-
-  // 🎯 Avvolta in useCallback per stabilità nell'useEffect
+  // ... (Il tuo codice Stripe fetchClientSecret rimane uguale) ...
   const fetchClientSecret = useCallback(async (
     total: number,
     currentOrderId: string, 
     cartItems: CartItemFrontend[]
   ) => {
-    
-    if (total <= 0 || !currentOrderId) { 
-      console.error("STRIPE FE ERROR: Carrello non valido o ID Ordine mancante.");
-      return;
-    }
-    
-    // 🛑 GUARDA: Blocca il refetch se stiamo già caricando
-    if (isLoadingSecret) return;
-
-    console.log(`--- STRIPE DEBUG FE: Avvio chiamata API Route per Client Secret per Ordine ${currentOrderId} ---`);
+    if (total <= 0 || !currentOrderId || isLoadingSecret) return;
 
     try {
       setIsLoadingSecret(true); 
-      
       const response = await fetch("/api/stripe/intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,7 +70,6 @@ export default function PaymentStep({
           orderId: currentOrderId, 
           cartItems: cartItems, 
           userId: userId, 
-          // baseUrl NON necessario, viene calcolato nell'API Route
         }),
       });
 
@@ -105,9 +77,7 @@ export default function PaymentStep({
 
       if (response.ok && data.clientSecret) {
         setStripeClientSecret(data.clientSecret);
-        console.log("DEBUG FE SUCCESS: Client Secret salvato via API.");
       } else {
-        console.error("DEBUG FE ERRORE: Fallimento API.", data.error); 
         toast({
           title: "Errore Stripe",
           description: data.error || "Impossibile creare Payment Intent.",
@@ -115,10 +85,9 @@ export default function PaymentStep({
         });
       }
     } catch (error) {
-      console.error("DEBUG FE ERRORE CATCH: Errore di connessione API Stripe:", error);
       toast({
         title: "Errore di Rete",
-        description: "Errore nel contattare l'API Stripe. Riprova.",
+        description: "Errore nel contattare l'API Stripe.",
         variant: "destructive",
       });
     } finally {
@@ -127,45 +96,25 @@ export default function PaymentStep({
   }, [toast, userId, isLoadingSecret]);
 
 
-  // ----------------------------------------------------------------------
-  // 🔑 EFFETTO: Reset Stati all'aggiornamento del carrello (chiave)
-  // ----------------------------------------------------------------------
+  // Effect Reset
   useEffect(() => {
-    // Resetta tutti gli stati se il carrello cambia, forzando un re-init
-    console.log(`DEBUG FE RESET: cartId è cambiato in ${cartId}.`);
     setOrderId(null);
     setStripeClientSecret(null);
-    setHasStripeInitialized(false); // 👈 RESETTA IL FLAG DI INIZIALIZZAZIONE
-    setIsCreatingOrder(false); // 👈 ASSICURATI che il blocco sia rilasciato
+    setHasStripeInitialized(false);
+    setIsCreatingOrder(false);
   }, [cartId]);
 
-
-  // ----------------------------------------------------------------------
-  // 🔑 FUNZIONE: Inizializzazione Atomica Stripe (Creazione Ordine + Richiesta Secret)
-  // ----------------------------------------------------------------------
+  // ... (Il tuo codice handleStripeInitialization rimane uguale) ...
   const handleStripeInitialization = useCallback(async () => {
-    // 🛑 GUARDA 1: Se è già in fase di creazione, usciamo immediatamente (PREVENZIONE DOPPIA ESECUZIONE 1)
-    if (isCreatingOrder) {
-      console.log("DEBUG FE: Inizializzazione già in corso. Blocco.");
-      return;
-    }
-    
-    // 🛑 GUARDA 2: Se abbiamo già completato l'inizializzazione (e abbiamo orderId e secret), usciamo.
-    if (hasStripeInitialized && orderId && stripeClientSecret) {
-        console.log("DEBUG FE: Inizializzazione completata e dati validi. Nessuna azione.");
-        return;
-    }
+    if (isCreatingOrder) return;
+    if (hasStripeInitialized && orderId && stripeClientSecret) return;
 
-
-    // 🚀 Inizio Inizializzazione
-    setHasStripeInitialized(true); // Imposta il flag di tentativo completato (PREVENZIONE DOPPIA ESECUZIONE 2)
-    setIsCreatingOrder(true); // 🚀 Blocca la creazione
+    setHasStripeInitialized(true);
+    setIsCreatingOrder(true);
     
     let currentOrderId: string | null = orderId;
 
-    // 1. CREAZIONE DELL'ORDINE (Esegui sempre se non esiste)
     if (!currentOrderId) {
-      console.log("STRIPE DEBUG FE: Avvio Creazione Ordine Unica nel DB...");
       try {
         const createResult = await createOrderAction({
           userId, cartId, totalPrice, itemsPrice, shippingPrice, taxPrice, shippingAddress, items
@@ -173,93 +122,112 @@ export default function PaymentStep({
         
         if (createResult.success && createResult.orderId) {
           currentOrderId = createResult.orderId;
-          setOrderId(currentOrderId); // Salva l'UUID nello stato
-          console.log(`STRIPE DEBUG FE: Ordine creato. UUID: ${currentOrderId}.`);
+          setOrderId(currentOrderId);
         } else {
-          console.error("Errore Creazione Ordine:", createResult.error);
-          toast({ title: "Errore Checkout", description: createResult.error || "Errore nella creazione dell'ordine.", variant: "destructive" });
-          setIsCreatingOrder(false); // Rilascia il blocco in caso di fallimento
-          return; // Blocca se l'ordine non è creato
+          toast({ title: "Errore Checkout", description: createResult.error || "Errore creazione ordine.", variant: "destructive" });
+          setIsCreatingOrder(false);
+          return; 
         }
       } catch(e) {
-        console.error("DEBUG FE ERRORE CATCH: Errore Server Action:", e);
-        toast({ title: "Errore di Sistema", description: "Errore critico durante la creazione dell'ordine.", variant: "destructive" });
-        setIsCreatingOrder(false); // Rilascia il blocco in caso di errore
+        toast({ title: "Errore Sistema", description: "Errore critico creazione ordine.", variant: "destructive" });
+        setIsCreatingOrder(false);
         return;
       }
     }
     
-    // 2. OTTENIMENTO DEL CLIENT SECRET
     if (currentOrderId && !stripeClientSecret && !isLoadingSecret) {
-      console.log("DEBUG FE: Ordine valido. Richiedo Client Secret.");
-      // Chiamiamo il fetchClientSecret
       await fetchClientSecret(totalPrice, currentOrderId, items);
     }
-
-    setIsCreatingOrder(false); // 🛑 Rilascia il blocco solo DOPO aver tentato tutte le operazioni
-  }, [
-    isCreatingOrder, orderId, stripeClientSecret, isLoadingSecret, hasStripeInitialized, // Stati
-    totalPrice, items, userId, cartId, itemsPrice, shippingPrice, taxPrice, shippingAddress, // Props
-    toast, fetchClientSecret
-  ]);
+    setIsCreatingOrder(false);
+  }, [isCreatingOrder, orderId, stripeClientSecret, isLoadingSecret, hasStripeInitialized, totalPrice, items, userId, cartId, itemsPrice, shippingPrice, taxPrice, shippingAddress, toast, fetchClientSecret]);
 
 
-  // ----------------------------------------------------------------------
-  // 🔑 LOGICA 3: useEffect per Inizializzazione Stripe (Trigger)
-  // ----------------------------------------------------------------------
-
+  // Trigger Stripe Initialization
   useEffect(() => {
-    // Condizione di Esecuzione: Se Carta è selezionata E non abbiamo ancora completato il ciclo di inizializzazione
     if (selectedMethod === "Carta di Credito / Debito" && !hasStripeInitialized) {
-      console.log("DEBUG FE: Trigger Inizializzazione Stripe.");
       handleStripeInitialization();
     }
-    
-    // Nota: Aggiungi tutte le dipendenze per l'esecuzione corretta
-  }, [
-    selectedMethod, 
-    hasStripeInitialized, 
-    handleStripeInitialization
-  ]);
+  }, [selectedMethod, hasStripeInitialized, handleStripeInitialization]);
 
-  // Funzione per gestire il cambio di metodo di pagamento
   const handleMethodChange = (value: string) => {
-    console.log(`DEBUG FE: Metodo cambiato da ${selectedMethod} a ${value}`);
     setSelectedMethod(value);
-    // Resetta TUTTI gli stati che forzano il re-fetch/re-creation
     setStripeClientSecret(null); 
     setOrderId(null); 
-    setHasStripeInitialized(false); // 👈 RESETTA IL FLAG DI INIZIALIZZAZIONE PER POTER RIPROVARE
-    setIsCreatingOrder(false); // Rilascia il blocco di creazione
-    // NON CHIAMARE LOGICA ATTIVA QUI! Lascia che l'useEffect si attivi
+    setHasStripeInitialized(false);
+    setIsCreatingOrder(false);
   };
 
+  // =====================================================================
+  // 🆕 LOGICA PAYPAL AGGIORNATA
+  // =====================================================================
+  const handlePayPalSuccess = async (paypalTransactionId: string) => {
+    if (isCreatingOrder) return;
+    setIsCreatingOrder(true);
 
-  // Logica per il Contrassegno: Simula un salvataggio immediato (DEVE CREARE L'ORDINE QUI)
+    let currentOrderId = orderId;
+
+    // 1. Crea l'ordine se non esiste
+    if (!currentOrderId) {
+        try {
+            const createResult = await createOrderAction({
+                userId, cartId, totalPrice, itemsPrice, shippingPrice, taxPrice, shippingAddress, items,
+                paymentMethod: "PayPal" // 🔑 FONDAMENTALE: Passiamo il metodo!
+            });
+
+            if (!createResult.success || !createResult.orderId) {
+                // ... errori
+                setIsCreatingOrder(false);
+                return;
+            }
+            currentOrderId = createResult.orderId;
+            setOrderId(currentOrderId);
+        } catch (error) {
+            // ... errori
+            setIsCreatingOrder(false);
+            return;
+        }
+    }
+
+    // 2. 🚀 CRUCIALE: Segna l'ordine come PAGATO nel DB
+    if (currentOrderId) {
+        await updateOrderAfterPayPalSuccess(currentOrderId, paypalTransactionId);
+    }
+
+    // 3. Finalizza Frontend
+    const paypalDetails: PaymentDetails = {
+      method: "PayPal",
+      last4: "N/A",
+      holder: `${shippingAddress.firstName} ${shippingAddress.lastName}`,
+      clientSecret: null,
+      paypalOrderId: paypalTransactionId,
+    };
+    
+    onSave(paypalDetails);
+    onPaymentSuccess();
+    setIsCreatingOrder(false);
+  };
+
+  // =====================================================================
+  // 🆕 LOGICA CONTRASSEGNO AGGIORNATA
+  // =====================================================================
   const handleCodSave = async () => {
-    // 🛑 GUARDA: Se è già in fase di creazione, usciamo
     if (isCreatingOrder) return;
 
-    // ⚠️ Per Contrassegno, l'ordine deve essere creato prima di passare allo step successivo
     if (!orderId) {
         setIsCreatingOrder(true);
         const createResult = await createOrderAction({
-            userId, cartId, totalPrice, itemsPrice, shippingPrice, taxPrice, shippingAddress, items
+            userId, cartId, totalPrice, itemsPrice, shippingPrice, taxPrice, shippingAddress, items,
+            paymentMethod: "Contrassegno" // 🔑 FONDAMENTALE: Passiamo il metodo!
         });
         setIsCreatingOrder(false);
 
         if (!createResult.success || !createResult.orderId) {
-            toast({
-                title: "Errore Contrassegno",
-                description: createResult.error || "Impossibile creare l'ordine per Contrassegno.",
-            });
+             // ... gestisci errore
             return;
         }
         setOrderId(createResult.orderId);
     }
 
-
-    console.log("DEBUG FE: Procedi con Contrassegno.");
     const codDetails: PaymentDetails = {
       method: "Contrassegno",
       last4: "N/A",
@@ -268,151 +236,97 @@ export default function PaymentStep({
       paypalOrderId: null,
     };
     
-    // 🔑 CORREZIONE 1: PRIMA salva i dettagli di pagamento
     onSave(codDetails); 
-    
-    // 🔑 CORREZIONE 2: DOPO notifica il successo (che svuota il carrello)
     onPaymentSuccess();
   };
-
-  // ----------------------------------------------------------------------
-  // MARKUP DI RENDERING
-  // ----------------------------------------------------------------------
-
   return (
     <div className="flex flex-col gap-8">
-      {/* Sezione 1. Scegli il Metodo */}
+      {/* Sezione 1: Scelta Metodo */}
       <div className="bg-white p-6 rounded-xl shadow-xl border border-gray-200">
-        <h2 className="text-2xl font-bold mb-4 text-gray-800">
-          1. Scegli il Metodo
-        </h2>
-        <RadioGroup
-          value={selectedMethod}
-          onValueChange={handleMethodChange}
-          className="flex gap-4 flex-wrap"
-        >
+        <h2 className="text-2xl font-bold mb-4 text-gray-800">1. Scegli il Metodo</h2>
+        <RadioGroup value={selectedMethod} onValueChange={handleMethodChange} className="flex gap-4 flex-wrap">
           <div className="flex items-center space-x-2 border p-4 rounded-lg flex-grow min-w-[200px]">
             <RadioGroupItem value="Carta di Credito / Debito" id="r1" />
-            <Label htmlFor="r1" className="font-medium">
-              Carta di Credito / Debito
-            </Label>
+            <Label htmlFor="r1">Carta di Credito / Debito</Label>
           </div>
           <div className="flex items-center space-x-2 border p-4 rounded-lg flex-grow min-w-[200px]">
             <RadioGroupItem value="PayPal" id="r2" />
-            <Label htmlFor="r2" className="font-medium">
-              PayPal
-            </Label>
+            <Label htmlFor="r2">PayPal</Label>
           </div>
           <div className="flex items-center space-x-2 border p-4 rounded-lg flex-grow min-w-[200px]">
             <RadioGroupItem value="Contrassegno" id="r3" />
-            <Label htmlFor="r3" className="font-medium">
-              Contrassegno
-            </Label>
+            <Label htmlFor="r3">Contrassegno</Label>
           </div>
         </RadioGroup>
       </div>
-      {/* Sezione 2. Inserisci Dettagli (Contenuto Dinamico) */}
+
+      {/* Sezione 2: Dettagli */}
       <div className="bg-white p-6 rounded-xl shadow-xl border border-gray-200">
-        <h2 className="text-2xl font-bold mb-4 text-gray-800">
-          2. Dettagli Pagamento ({selectedMethod})
-        </h2>
+        <h2 className="text-2xl font-bold mb-4 text-gray-800">2. Dettagli Pagamento ({selectedMethod})</h2>
+        
+        {/* STRIPE */}
         {selectedMethod === "Carta di Credito / Debito" && (
           <div className="min-h-[150px]">
-            {/* ⏳ Stato di Caricamento dell'Ordine O del Client Secret */}
             {(isLoadingSecret || isCreatingOrder) && (
-              <p className="text-gray-500 italic font-semibold">
-                Caricamento del modulo Stripe in corso...
-              </p>
+              <p className="text-gray-500 italic font-semibold">Caricamento Stripe...</p>
             )}
-            {/* 💳 Componente Stripe (Renderizzato solo con il Secret e l'UUID) */}
-            {stripeClientSecret &&
-              orderId && ( 
+            {stripeClientSecret && orderId && ( 
                 <StripePaymentComponent
                   client_secret={stripeClientSecret}
                   orderId={orderId} 
                   totalPrice={totalPrice}
                   onPaymentSuccess={(paymentIntentId) => {
-                    console.log(
-                      "DEBUG FE: Pagamento Stripe completato. Notifico il genitore."
-                    );
-                    
-                    // 🔑 CORREZIONE 1: PRIMA salva i dettagli di pagamento
                     onSave({
                       method: "Carta di Credito / Debito",
                       last4: "0000",
                       holder: `${shippingAddress.firstName} ${shippingAddress.lastName}`,
-                      clientSecret: stripeClientSecret, // Passa il Secret corretto
+                      clientSecret: stripeClientSecret,
                       paypalOrderId: null,
                     });
-                    
-                    // 🔑 CORREZIONE 2: DOPO notifica il successo
                     onPaymentSuccess();
                   }}
                 />
-              )}
-            {/* Messaggio di Errore se non abbiamo il Secret e non stiamo caricando */}
-            {!isLoadingSecret && !isCreatingOrder && !stripeClientSecret && hasStripeInitialized && (
-              <div className="p-4 bg-red-100 text-red-700 border border-red-300 rounded-md">
-                ❌ **Errore di Pagamento:** Impossibile caricare il modulo
-                Stripe. Se l'importo è corretto, controlla la console per gli
-                errori.
-              </div>
             )}
           </div>
         )}
-        {/* Contenuto PayPal */}
+
+        {/* PAYPAL */}
         {selectedMethod === "PayPal" && (
           <div className="min-h-[150px]">
-            <p className="mb-4">
-              Sarai reindirizzato a PayPal per completare il pagamento di **€
-              {formatCurrency(totalPrice)}**.
-            </p>
-            <PayPalButtonComponent
-              onPaymentSuccess={(paypalOrderId, transactionId) => {
-                console.log(
-                  `DEBUG FE: Pagamento PayPal completato. Order ID: ${paypalOrderId}`
-                );
-                const paypalDetails: PaymentDetails = {
-                  method: "PayPal",
-                  last4: "N/A",
-                  holder: `${shippingAddress.firstName} ${shippingAddress.lastName}`,
-                  clientSecret: null,
-                  paypalOrderId: paypalOrderId,
-                };
-                
-                // 🔑 CORREZIONE 1: PRIMA salva i dettagli di pagamento
-                onSave(paypalDetails);
-                
-                // 🔑 CORREZIONE 2: DOPO notifica il successo
-                onPaymentSuccess();
-              }}
-              isPaid={false}
-              // ⚠️ Passiamo l'orderId (se esiste) o il cartId. 
-              // Se la logica PayPal lato server crea l'ordine, va bene.
-              orderId={orderId ?? cartId} 
-              finalPrice={totalPrice.toString()}
-              itemsPrice={itemsPrice.toString()}
-              shippingPrice={shippingPrice.toString()}
-              taxPrice={taxPrice.toString()}
-              items={items}
-              userId={userId}
-              shippingAddress={shippingAddress}
-            />
+             {isCreatingOrder ? (
+                 <p className="text-green-600 font-semibold animate-pulse">
+                     Pagamento ricevuto. Creazione ordine in corso...
+                 </p>
+             ) : (
+                <>
+                    <p className="mb-4">
+                    Sarai reindirizzato a PayPal per completare il pagamento di €{formatCurrency(totalPrice)}.
+                    </p>
+                    <PayPalButtonComponent
+                    // ⚠️ Passiamo handlePayPalSuccess qui
+                    onPaymentSuccess={handlePayPalSuccess}
+                    isPaid={false}
+                    // Qui passiamo cartId se orderId è null, va bene per PayPal ma non per il DB
+                    orderId={orderId ?? cartId} 
+                    finalPrice={totalPrice.toString()}
+                    itemsPrice={itemsPrice.toString()}
+                    shippingPrice={shippingPrice.toString()}
+                    taxPrice={taxPrice.toString()}
+                    items={items}
+                    userId={userId}
+                    shippingAddress={shippingAddress}
+                    />
+                </>
+             )}
           </div>
         )}
-        {/* Contenuto Contrassegno */}
+
+        {/* CONTRASSEGNO */}
         {selectedMethod === "Contrassegno" && (
           <div>
-            <p className="mb-6 text-gray-700">
-              Pagherai **€{formatCurrency(totalPrice)}** in contanti alla
-              consegna.
-            </p>
-            <Button
-              onClick={handleCodSave}
-              disabled={isCreatingOrder} // Disabilita se stiamo creando l'ordine
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {isCreatingOrder ? "Creazione Ordine..." : "Procedi con Contrassegno"}
+            <p className="mb-6 text-gray-700">Pagherai €{formatCurrency(totalPrice)} in contanti alla consegna.</p>
+            <Button onClick={handleCodSave} disabled={isCreatingOrder} className="bg-green-600 hover:bg-green-700">
+              {isCreatingOrder ? "Elaborazione..." : "Procedi con Contrassegno"}
             </Button>
           </div>
         )}
