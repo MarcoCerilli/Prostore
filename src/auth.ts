@@ -15,6 +15,7 @@ type ExtendedUser = NextAuthUser & {
 
 // 🛑 DEFINIZIONE ED ESPORTAZIONE DELL'OGGETTO DI CONFIGURAZIONE (authOptions)
 export const authOptions = {
+    url: process.env.AUTH_URL || 'https://prostore-gamma-six.vercel.app',
   // 1. ADAPTER
   adapter: PrismaAdapter(prisma) as any,
 
