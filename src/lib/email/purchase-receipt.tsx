@@ -101,7 +101,7 @@ export default function PurchaseReceiptEmail({ order }: OrderInformationProps) {
                         <Heading className="text-3xl font-bold text-center text-indigo-700">
                             Ricevuta d'Acquisto
                         </Heading>
-                        <Text className="text-center text-lg text-gray-700">Grazie per il tuo ordine, **{userName}**!</Text>
+                        <Text className="text-center text-lg text-gray-700">Grazie per il tuo ordine, {userName}!</Text>
 
                         {/* === RIQUADRO INFORMAZIONI PRINCIPALI (INDIGO) === */}
                         <Section className="my-6 p-4 border border-solid border-indigo-300 rounded-lg bg-indigo-50/50">
