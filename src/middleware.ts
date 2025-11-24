@@ -31,7 +31,7 @@ export async function middleware(request: NextRequest) {
   if (isProtected) {
     if (!token) {
       // Se non autenticato e la rotta è protetta, reindirizza al login
-      const loginUrl = new URL("/login", request.url);
+      const loginUrl = new URL("/sign-in", request.url);
       loginUrl.searchParams.set("callbackUrl", currentPath);
       return NextResponse.redirect(loginUrl);
     }
