@@ -1,111 +1,189 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { getPaymentIntentStatusAction } from '@/lib/actions/user.actions';
-import { CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
 
-// IMPORTAZIONE FONDAMENTALE DI STRIPE.JS
-import { useStripe } from '@stripe/react-stripe-js'; 
+// Simulazione di next/navigation e lucide-react (per l'ambiente autonomo)
+const useSearchParams = () => {
+    // Simula la lettura dei parametri dall'URL (se l'app fosse in un contesto reale)
+    // Qui dobbiamo usare window.location.search per l'ambiente Immersive
+    if (typeof window === 'undefined') return new URLSearchParams();
+    return new URLSearchParams(window.location.search);
+};
+const useRouter = () => ({ 
+    replace: (url) => { console.log(`[NAVIGAZIONE SIMULATA] Reindirizzamento a: ${url}`); } 
+});
+// Simulazione delle icone Lucide (se non disponibili)
+const CheckCircle = ({ className }) => <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const XCircle = ({ className }) => <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const Clock = ({ className }) => <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const Loader2 = ({ className }) => <svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>;
+
+// ⚠️ SIMULAZIONE: Funzioni di Stripe e Server Action
+// In un ambiente reale, questi sarebbero importati e connessi a un backend.
+const useStripe = () => ({
+    retrievePaymentIntent: async (secret) => {
+        console.log(`[SIMULAZIONE STRIPE.JS] Tentativo di recuperare il PI per ${secret}`);
+        // Simulazione di una logica di successo:
+        if (secret && secret.startsWith('pi_success')) {
+            return { 
+                paymentIntent: { status: 'succeeded' }, 
+                error: null 
+            };
+        }
+        // Simulazione di un'azione richiesta (es. 3D Secure non completato)
+        if (secret && secret.startsWith('pi_action')) {
+             return { 
+                paymentIntent: { status: 'requires_action' }, 
+                error: null 
+            };
+        }
+        // Simulazione errore generico
+        return { paymentIntent: null, error: { message: 'Simulated API Error' } };
+    }
+});
+
+/**
+ * SIMULAZIONE della Server Action getPaymentIntentStatusAction
+ * In un ambiente reale, questa farebbe la vera chiamata a Stripe Server-side e l'aggiornamento Prisma.
+ * (La tua logica originale è stata integrata qui per la dimostrazione)
+ */
+const getPaymentIntentStatusAction = async (orderNumber, clientSecret, serverStatus) => {
+    console.log(`[SIMULAZIONE SERVER] Verifico Ordine #${orderNumber} con stato PI: ${serverStatus}`);
+
+    // Logica semplificata basata sulla tua Server Action originale
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simula il ritardo del DB/API
+
+    switch (serverStatus) {
+        case 'succeeded':
+            // Simula la logica per determinare il metodo (Stripe o PayPal)
+            const isPayPal = orderNumber.includes('PAYPAL');
+            const paymentMethod = isPayPal ? 'PAYPAL' : 'STRIPE_CARD';
+
+            // Simula l'aggiornamento di successo nel DB
+            return {
+                status: 'SUCCESS',
+                message: `Il pagamento è stato completato con successo tramite ${paymentMethod}. L'ordine #${orderNumber} è confermato!`,
+                orderNumber: orderNumber,
+                paymentIntentId: clientSecret.split('_secret_')[0]
+            };
+        
+        case 'processing':
+            // Simula lo stato Pending
+            return {
+                status: 'PENDING',
+                message: "Il tuo pagamento è in fase di elaborazione. Riceverai una conferma via email a breve.",
+                orderNumber: orderNumber,
+                paymentIntentId: clientSecret.split('_secret_')[0]
+            };
+
+        case 'requires_action':
+        case 'requires_payment_method':
+        case 'canceled':
+            // Simula lo stato Fallito
+            return {
+                status: 'FAILURE',
+                message: "Il pagamento non è riuscito o è stato annullato. Riprova dalla pagina dell'ordine.",
+                orderNumber: orderNumber,
+                paymentIntentId: clientSecret.split('_secret_')[0]
+            };
+
+        default:
+             return {
+                status: 'FAILURE',
+                message: `Stato di pagamento inatteso: ${serverStatus}. Contatta il supporto.`,
+                orderNumber: orderNumber,
+                paymentIntentId: 'N/A'
+             };
+    }
+};
 
 /**
  * Componente per la pagina di successo/fallimento del pagamento con Stripe.
- * Questa pagina viene visualizzata dopo il reindirizzamento da Stripe Checkout (incl. PayPal).
- * * 1. Usa useStripe() per recuperare il Payment Intent lato client (obbligatorio per PayPal/Redirect).
- * 2. Chiama la Server Action per la verifica e l'aggiornamento finale dell'ordine.
  */
 export default function PaymentSuccess() {
-    // 1. Recupera i parametri dall'URL e l'oggetto Stripe
     const searchParams = useSearchParams();
     const router = useRouter(); 
-    const stripe = useStripe(); // OTTENERE L'OGGETTO STRIPE
+    const stripe = useStripe(); 
     
+    // Legge i parametri essenziali dall'URL
     const clientSecret = searchParams.get('payment_intent_client_secret');
-    const orderNumberFromUrl = searchParams.get('order_number');
+    const orderNumber = searchParams.get('order_number');
     const redirectStatus = searchParams.get('redirect_status'); 
 
-    // 2. Stato per gestire il flusso e i risultati
-    const [status, setStatus] = useState<'LOADING' | 'VERIFYING' | 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR'>('LOADING');
+    const [status, setStatus] = useState('LOADING');
     const [message, setMessage] = useState('Verifica dello stato del pagamento in corso...');
-    const [finalOrderNumber, setFinalOrderNumber] = useState(orderNumberFromUrl);
-
-    // Stato per tracciare se la verifica è già stata avviata
+    const [finalOrderNumber, setFinalOrderNumber] = useState(orderNumber);
     const [isVerificationStarted, setIsVerificationStarted] = useState(false);
 
-    useEffect(() => {
-        // Funzione asincrona per chiamare la Server Action
-        const verifyPayment = async () => {
-            // Impedisce esecuzioni multiple
-            if (isVerificationStarted) return; 
-            setIsVerificationStarted(true);
+    const verifyPayment = useCallback(async () => {
+        // Impedisce esecuzioni multiple (già gestito da useEffect, ma è una buona pratica)
+        if (isVerificationStarted) return; 
+        
+        // Check iniziale dei dati
+        if (!clientSecret || !orderNumber || !stripe) {
+            if (stripe) {
+                setStatus('ERROR');
+                setMessage('Mancano i parametri essenziali per la verifica (client secret/numero ordine).');
+            }
+            return; 
+        }
+        
+        setIsVerificationStarted(true);
+        setStatus('VERIFYING');
+        setMessage('Verifica dello stato del pagamento con Stripe...');
 
-            if (!clientSecret || !orderNumberFromUrl || !stripe) {
-                // Se manca un dato essenziale, setta l'errore se Stripe è pronto, altrimenti continua ad attendere
-                if (stripe) {
-                    setStatus('ERROR');
-                    setMessage('Mancano i parametri essenziali per la verifica (client secret/numero ordine).');
-                }
+        try {
+            // PRIMO PASSO: Usa Stripe.js lato client
+            const { paymentIntent: pi, error: retrieveError } = await stripe.retrievePaymentIntent(clientSecret);
+
+            if (retrieveError) {
+                throw new Error(`Errore Stripe.js: ${retrieveError.message}`);
+            }
+
+            // SECONDO PASSO: Chiama la Server Action per aggiornare l'ordine nel DB.
+            const serverStatus = pi?.status || redirectStatus; 
+            
+            const result = await getPaymentIntentStatusAction(
+                orderNumber, 
+                clientSecret,
+                serverStatus || '' 
+            );
+            
+            setStatus(result.status);
+            setMessage(result.message);
+            
+            // Gestione reindirizzamento in caso di successo
+            if (result.status === 'SUCCESS' && result.orderNumber) {
+                setFinalOrderNumber(result.orderNumber);
+                
+                setTimeout(() => {
+                    // router.replace è simulato per coerenza
+                    router.replace(`/dashboard/orders/${result.orderNumber}`);
+                }, 1500); 
+                
                 return;
             }
 
-            setStatus('VERIFYING');
-            setMessage('Verifica dello stato del pagamento con Stripe...');
-
-            try {
-                // PRIMO PASSO: Usa Stripe.js lato client per recuperare e finalizzare il PI.
-                // Questa chiamata è CRITICA per i metodi di reindirizzamento come PayPal.
-                console.log("STRIPE.JS: Tentativo di retrievePaymentIntent lato client...");
-                const { paymentIntent: pi, error: retrieveError } = await stripe.retrievePaymentIntent(clientSecret);
-
-                if (retrieveError) {
-                    throw new Error(`Errore Stripe.js: ${retrieveError.message}`);
-                }
-
-                // SECONDO PASSO: Chiama la Server Action per aggiornare l'ordine nel DB.
-                const serverStatus = pi?.status || redirectStatus; 
-                console.log(`SERVER ACTION: Chiamata con PI Status: ${serverStatus} e Secret: ${clientSecret}`);
-                
-                const result = await getPaymentIntentStatusAction(
-                    orderNumberFromUrl,
-                    clientSecret,
-                    serverStatus || '' 
-                );
-                
-                // Aggiorna lo stato e il messaggio
-                setStatus(result.status);
-                setMessage(result.message);
-                
-                // Gestione reindirizzamento
-                if (result.status === 'SUCCESS' && result.orderNumber) {
-                    setFinalOrderNumber(result.orderNumber);
-                    
-                    console.log(`✅ Pagamento verificato. Reindirizzamento a /dashboard/orders/${result.orderNumber}`);
-                    // Reindirizzamento ritardato per dare tempo al DOM di aggiornarsi
-                    setTimeout(() => {
-                        router.replace(`/dashboard/orders/${result.orderNumber}`);
-                    }, 1500); 
-                    
-                    return;
-                }
-
-            } catch (error) {
-                console.error('Errore durante la verifica Stripe/Server Action:', error);
-                setStatus('ERROR');
-                setMessage('Si è verificato un errore inaspettato durante la verifica del server. Controlla la console del server.');
-            }
-        };
-
-        // Esegui la verifica solo se tutti i dati sono presenti e Stripe è inizializzato
-        if (clientSecret && orderNumberFromUrl && stripe && !isVerificationStarted) {
-            verifyPayment();
-        } else if (!clientSecret && !isVerificationStarted) {
+        } catch (error) {
+            console.error('Errore durante la verifica Stripe/Server Action:', error);
             setStatus('ERROR');
-            setMessage('Pagamento non completato. Nessun "client_secret" trovato nell\'URL.');
+            setMessage('Si è verificato un errore inaspettato durante la verifica del server. Controlla la console del server.');
+        }
+    }, [clientSecret, orderNumber, redirectStatus, stripe, isVerificationStarted, router]);
+
+    useEffect(() => {
+        // Esegui la funzione se non è stata ancora avviata e clientSecret è presente.
+        if (clientSecret && !isVerificationStarted) {
+            verifyPayment();
+        } else if (!clientSecret && status === 'LOADING') {
+             // Imposta lo stato di errore iniziale solo se non è già stata avviata alcuna operazione
+             setStatus('ERROR');
+             setMessage('Pagamento non completato. Nessun "client_secret" trovato nell\'URL. Torna al carrello per riprovare.');
         }
 
-    }, [clientSecret, orderNumberFromUrl, redirectStatus, router, stripe, isVerificationStarted]); // isVerificationStarted è la nuova dipendenza
+    }, [clientSecret, status, isVerificationStarted, verifyPayment]); 
 
-    // 3. Funzione per decidere lo stile e l'icona (LOGICA DISPLAY INVARIATA)
+    // 3. Funzione per decidere lo stile e l'icona
     const getStatusDisplay = () => {
         switch (status) {
             case 'SUCCESS':
