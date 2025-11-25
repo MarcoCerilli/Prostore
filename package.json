@@ -16,7 +16,7 @@
     "generate": "dotenv -e .env.local -- npx prisma generate",
     "test": "jest",
     "test:watch": "jest --watch",
-    "email": "shx cp .env ./node_modules/react-email && email dev --dir src/lib/email --port 3001"
+    "email": "shx cp .env.local ./node_modules/react-email && email dev --dir src/lib/email --port 3001"
   },
   "dependencies": {
     "@auth/core": "^0.41.1",

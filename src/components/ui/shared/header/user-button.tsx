@@ -75,7 +75,7 @@ const UserButton = () => {
           {/* ⭐ NUOVO: Link all'Area Admin, visibile solo se isAdmin è true */}
           {isAdmin && (
             <DropdownMenuItem asChild>
-              <Link href="/admin" className="flex items-center w-full">
+              <Link href="dashboard/admin" className="flex items-center w-full">
                 <ListOrdered className="w-4 h-4 mr-2" />
                 Area Admin
               </Link>
