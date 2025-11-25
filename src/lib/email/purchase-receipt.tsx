@@ -88,90 +88,80 @@ type OrderInformationProps = {
 };
 
 export default function PurchaseReceiptEmail({ order }: OrderInformationProps) {
-  const userName = order.user?.name ?? "Cliente";
+  const userName = order.user?.name ?? "Cliente"; // 🛑 CORREZIONE 1: BASE URL UNIVERSALE (Risolve Immagini rotte in Locale/Prod)
+  const BASE_URL = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3000"; // 1. VARIABILI: Determina il messaggio dinamico
 
-  const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3000";
-
-  // 1. VARIABILI E LOGICA DI STATO CORRETTE
   const paymentMethodText =
     order.paymentMethod === "Contrassegno"
       ? "Contrassegno"
       : order.paymentMethod;
 
-  let statusText: string;
-  let statusMessage: string;
-  let statusBgClass: string;
-  let statusBorderClass: string;
+  const paymentStatusMessage =
+    order.paymentMethod === "Contrassegno"
+      ? "Non è richiesto alcun pagamento immediato. Ti preghiamo di preparare l'importo totale in contanti al momento della consegna."
+      : order.isPaid
+        ? "Il pagamento è stato elaborato con successo e l'ordine è in preparazione."
+        : "L'ordine è stato creato in attesa di pagamento."; // Per Stripe/altri metodi in attesa
 
-  const isCOD = order.paymentMethod.toLowerCase().includes("contrassegno");
-
-  if (isCOD) {
-    statusText = "Da Pagare alla Consegna 🟡";
-    statusMessage =
-      "Non è richiesto alcun pagamento immediato. Ti preghiamo di preparare l'importo totale in contanti al momento della consegna.";
-    statusBgClass = "bg-yellow-100";
-    statusBorderClass = "border-yellow-300";
-  } else if (order.isPaid) {
-    statusText = "Pagato ✔️";
-    statusMessage =
-      "Il pagamento è stato elaborato con successo e l'ordine è in preparazione.";
-    statusBgClass = "bg-green-100";
-    statusBorderClass = "border-green-300";
-  } else {
-    // Assume 'In Attesa' per tutti gli altri casi (Stripe/Paypal non pagati)
-    statusText = "In Attesa di Pagamento 🔴";
-    statusMessage =
-      "L'ordine è stato creato ed è in attesa di conferma di pagamento.";
-    statusBgClass = "bg-red-100";
-    statusBorderClass = "border-red-300";
-  }
   return (
     <Html>
       <Preview>Ricevuta del tuo ordine #{order.id}</Preview>
 
       <Tailwind>
         <Head />
-
         <Body className="font-sans bg-gray-50">
           <Container className="max-w-xl p-6 bg-white shadow-lg rounded-xl">
             <Heading className="text-3xl font-bold text-center text-indigo-700">
               Ricevuta d'Acquisto
             </Heading>
+
             <Text className="text-center text-lg text-gray-700">
               Grazie per il tuo ordine, {userName}!
             </Text>
 
             {/* === RIQUADRO INFORMAZIONI PRINCIPALI (INDIGO) === */}
+
             <Section className="my-6 p-4 border border-solid border-indigo-300 rounded-lg bg-indigo-50/50">
               <Row>
                 <Column>
-                  <Text className="mb-0 text-sm font-semibold text-gray-500 whitespace-nowrap">
+                  <Text className="mb-0 text-sm font-semibold text-gray-500 whitespace-nowrap text-nowrap">
                     ID Ordine
                   </Text>
+
                   <Text className="mb-0 text-indigo-700 text-lg font-bold">
                     {order.id.toString()}
                   </Text>
                 </Column>
+
                 <Column>
-                  <Text className="mb-0 text-sm font-semibold text-gray-500 whitespace-nowrap">
+                  <Text className="mb-0 text-sm font-semibold text-gray-500 whitespace-nowrap text-nowrap">
                     Data
                   </Text>
+
                   <Text className="mb-0 text-indigo-700 text-lg">
                     {dateFormatter.format(order.createdAt)}
                   </Text>
                 </Column>
+
+                {/* 2. AGGIUNTA: Metodo di Pagamento */}
+
                 <Column>
-                  <Text className="mb-0 text-sm font-semibold text-gray-500 whitespace-nowrap">
+                  <Text className="mb-0 text-sm font-semibold text-gray-500 whitespace-nowrap text-nowrap">
                     Metodo
                   </Text>
-                  <Text className="mb-0 text-indigo-700 text-lg">
+
+                  <Text className="mb-0 text-indigo-700 text-lg font-bold">
                     {paymentMethodText}
                   </Text>
                 </Column>
-                <Column align="right">
-                  <Text className="mb-0 text-sm font-semibold text-gray-500 whitespace-nowrap">
+
+                <Column>
+                  <Text className="mb-0 text-sm font-semibold text-gray-500 whitespace-nowrap text-nowrap">
                     Totale
                   </Text>
+
                   <Text className="mb-0 text-indigo-700 text-xl font-extrabold">
                     {formatCurrency(order.totalPrice)}
                   </Text>
@@ -180,20 +170,29 @@ export default function PurchaseReceiptEmail({ order }: OrderInformationProps) {
             </Section>
 
             {/* 3. AGGIUNTA: Sezione Stato Pagamento (Messaggio Dinamico) */}
+
             <Section
-              className={`p-4 rounded-lg text-center border border-solid ${statusBorderClass} ${statusBgClass}`}
+              className={`p-4 rounded-lg text-center ${order.paymentMethod === "Contrassegno" ? "bg-yellow-100 border border-yellow-300" : "bg-green-100 border border-green-300"}`}
             >
               <Text className="text-lg font-semibold m-0 text-gray-800">
-                Stato Pagamento: {statusText}
+                Stato Pagamento:
+                {order.paymentMethod === "Contrassegno"
+                  ? "Da Pagare alla Consegna"
+                  : order.isPaid
+                    ? "Pagato"
+                    : "In Attesa di Pagamento"}
               </Text>
-              <Text className="text-sm m-0 text-gray-600">{statusMessage}</Text>
+
+              <Text className="text-sm m-0 text-gray-600">
+                {paymentStatusMessage}
+              </Text>
             </Section>
 
             <Text className="text-xl font-semibold mt-8 mb-4">
               Dettagli Ordine
             </Text>
-
             {/* === LISTA ARTICOLI (BORDO INDIGO) === */}
+
             <Section className="border border-solid border-indigo-300 rounded-lg p-4 md:p-6 my-4 bg-white">
               {order.orderItems.map((item, index) => (
                 <Row
@@ -201,6 +200,7 @@ export default function PurchaseReceiptEmail({ order }: OrderInformationProps) {
                   className={`py-4 ${index > 0 ? "border-t border-gray-200" : ""}`}
                 >
                   {/* Colonna Immagine (Logica corretta per URL assoluto) */}
+
                   <Column className="w-20">
                     <Img
                       width="80"
@@ -208,30 +208,35 @@ export default function PurchaseReceiptEmail({ order }: OrderInformationProps) {
                       className="rounded"
                       src={
                         item.image.startsWith("/")
-                          ? `${baseUrl}${item.image}` // Ora usa sempre baseUrl
+                          ? // 🛑 CORREZIONE 1: Usa la BASE_URL definita
+                            `${BASE_URL}${item.image}`
                           : item.image
                       }
                     />
                   </Column>
                   {/* Colonna Dettagli */}
+
                   <Column className="align-top px-4">
                     <Text className="m-0 text-gray-800 font-medium">
                       {item.name}
                     </Text>
+
                     <Text className="m-0 text-sm text-gray-500">
-                      Qtà: {item.qty}
+                      Qtà:
+                      {item.qty}
                     </Text>
                   </Column>
                   {/* Colonna Prezzo */}
+
                   <Column align="right" className="align-top">
                     <Text className="m-0 text-gray-800 font-semibold">
-                      {formatCurrency(item.price)}{" "}
+                      {formatCurrency(item.price)}
                     </Text>
                   </Column>
                 </Row>
               ))}
-
               {/* === RIASSUNTO PREZZI === */}
+
               <Section className="mt-6 border-t border-gray-200 pt-4">
                 {[
                   { name: "Subtotale (Articoli)", price: order.itemsPrice },
@@ -240,8 +245,9 @@ export default function PurchaseReceiptEmail({ order }: OrderInformationProps) {
                 ].map(({ name, price }) => (
                   <Row key={name} className="py-0.5">
                     <Column align="right" className="text-gray-600 pr-2">
-                      {name}:{" "}
+                      {name}:
                     </Column>
+
                     <Column
                       align="right"
                       width={100}
@@ -253,8 +259,8 @@ export default function PurchaseReceiptEmail({ order }: OrderInformationProps) {
                     </Column>
                   </Row>
                 ))}
-
                 {/* Totale Finale Evidenziato */}
+
                 <Row className="py-2 border-t border-indigo-400 mt-2">
                   <Column
                     align="right"
@@ -262,6 +268,7 @@ export default function PurchaseReceiptEmail({ order }: OrderInformationProps) {
                   >
                     Totale:
                   </Column>
+
                   <Column
                     align="right"
                     width={100}
