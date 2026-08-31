@@ -6,16 +6,8 @@ import Image from "next/image";
 import { PaymentBadgesList } from "@/components/ui/shared/payment-badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Mail,
-  ShieldCheck,
-  Sparkles,
-  Instagram,
-  Facebook,
-  Twitter,
-  Youtube,
-  ArrowRight,
-} from "lucide-react";
+import { Mail, ShieldCheck, Sparkles, ArrowRight } from "lucide-react";
+import { SiInstagram, SiFacebook, SiX, SiYoutube, SiTiktok } from "react-icons/si";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -60,15 +52,15 @@ const Footer = () => {
         <div className="wrapper">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
             <div className="max-w-xl space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs font-semibold">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Offerta di Benvenuto</span>
               </div>
-              <h3 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
                 Iscriviti alla Newsletter e ricevi il 10% di sconto
               </h3>
               <p className="text-sm text-muted-foreground">
-                Rimani aggiornato su nuove collezioni, promozioni esclusive e trend di stagione. Niente spam, cancellati quando vuoi.
+                Rimani aggiornato su nuovi arrivi, promozioni esclusive e tendenze moda.
               </p>
             </div>
 
@@ -117,42 +109,51 @@ const Footer = () => {
               {APP_DESCRIPTION || "ModernStore è la tua destinazione online per la moda contemporanea, capi di tendenza e shopping di qualità garantita."}
             </p>
 
-            <div className="pt-2 flex items-center gap-3 text-muted-foreground">
+            <div className="pt-2 flex items-center gap-2.5 text-muted-foreground">
               <Link
                 href="https://instagram.com"
                 target="_blank"
                 rel="noreferrer"
-                className="p-2 rounded-xl bg-background border border-border/60 hover:text-pink-600 hover:border-pink-300 dark:hover:border-pink-800 transition-colors"
+                className="p-2.5 rounded-xl bg-background border border-border/60 hover:text-pink-600 hover:border-pink-300 dark:hover:border-pink-800 transition-all hover:scale-105"
                 aria-label="Instagram"
               >
-                <Instagram className="w-4 h-4" />
+                <SiInstagram className="w-4 h-4" />
+              </Link>
+              <Link
+                href="https://tiktok.com"
+                target="_blank"
+                rel="noreferrer"
+                className="p-2.5 rounded-xl bg-background border border-border/60 hover:text-black dark:hover:text-white hover:border-zinc-400 transition-all hover:scale-105"
+                aria-label="TikTok"
+              >
+                <SiTiktok className="w-4 h-4" />
               </Link>
               <Link
                 href="https://facebook.com"
                 target="_blank"
                 rel="noreferrer"
-                className="p-2 rounded-xl bg-background border border-border/60 hover:text-blue-600 hover:border-blue-300 dark:hover:border-blue-800 transition-colors"
+                className="p-2.5 rounded-xl bg-background border border-border/60 hover:text-blue-600 hover:border-blue-300 dark:hover:border-blue-800 transition-all hover:scale-105"
                 aria-label="Facebook"
               >
-                <Facebook className="w-4 h-4" />
+                <SiFacebook className="w-4 h-4" />
               </Link>
               <Link
-                href="https://twitter.com"
+                href="https://x.com"
                 target="_blank"
                 rel="noreferrer"
-                className="p-2 rounded-xl bg-background border border-border/60 hover:text-sky-500 hover:border-sky-300 dark:hover:border-sky-800 transition-colors"
-                aria-label="Twitter"
+                className="p-2.5 rounded-xl bg-background border border-border/60 hover:text-zinc-900 dark:hover:text-zinc-100 hover:border-zinc-400 transition-all hover:scale-105"
+                aria-label="X (Twitter)"
               >
-                <Twitter className="w-4 h-4" />
+                <SiX className="w-4 h-4" />
               </Link>
               <Link
                 href="https://youtube.com"
                 target="_blank"
                 rel="noreferrer"
-                className="p-2 rounded-xl bg-background border border-border/60 hover:text-red-600 hover:border-red-300 dark:hover:border-red-800 transition-colors"
+                className="p-2.5 rounded-xl bg-background border border-border/60 hover:text-red-600 hover:border-red-300 dark:hover:border-red-800 transition-all hover:scale-105"
                 aria-label="YouTube"
               >
-                <Youtube className="w-4 h-4" />
+                <SiYoutube className="w-4 h-4" />
               </Link>
             </div>
           </div>

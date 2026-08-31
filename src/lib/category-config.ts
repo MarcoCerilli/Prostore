@@ -1,19 +1,19 @@
+import React from "react";
+import { TbJacket } from "react-icons/tb";
 import {
-  Shirt,
-  Flame,
-  Layers,
-  Sparkles,
-  ShoppingBag,
-  Tag,
-  Footprints,
-  Watch,
-  Glasses,
-  Crown,
-  type LucideIcon,
-} from "lucide-react";
+  PiHoodieBold,
+  PiTShirtBold,
+  PiPantsBold,
+  PiSneakerBold,
+  PiShirtFoldedBold,
+  PiWatchBold,
+  PiSunglassesBold,
+  PiFlameBold,
+  PiSparkleBold,
+} from "react-icons/pi";
 
 export interface CategoryMeta {
-  icon: LucideIcon;
+  icon: React.ComponentType<{ className?: string }>;
   color: string;
   bgLight: string;
   bgDark: string;
@@ -23,7 +23,7 @@ export interface CategoryMeta {
 
 const CATEGORY_MAP: Record<string, CategoryMeta> = {
   felpe: {
-    icon: Layers,
+    icon: PiHoodieBold,
     color: "text-violet-600 dark:text-violet-400",
     bgLight: "bg-violet-50 hover:bg-violet-100",
     bgDark: "dark:bg-violet-950/40 dark:hover:bg-violet-900/40",
@@ -31,7 +31,7 @@ const CATEGORY_MAP: Record<string, CategoryMeta> = {
     description: "Comfort, stile e calore per ogni occasione",
   },
   capispalla: {
-    icon: Crown,
+    icon: TbJacket,
     color: "text-amber-600 dark:text-amber-400",
     bgLight: "bg-amber-50 hover:bg-amber-100",
     bgDark: "dark:bg-amber-950/40 dark:hover:bg-amber-900/40",
@@ -39,7 +39,7 @@ const CATEGORY_MAP: Record<string, CategoryMeta> = {
     description: "Giacche e cappotti di alta qualità",
   },
   "abbigliamento-sportivo": {
-    icon: Flame,
+    icon: PiFlameBold,
     color: "text-emerald-600 dark:text-emerald-400",
     bgLight: "bg-emerald-50 hover:bg-emerald-100",
     bgDark: "dark:bg-emerald-950/40 dark:hover:bg-emerald-900/40",
@@ -47,7 +47,7 @@ const CATEGORY_MAP: Record<string, CategoryMeta> = {
     description: "Performance e libertà di movimento",
   },
   "t-shirt": {
-    icon: Shirt,
+    icon: PiTShirtBold,
     color: "text-blue-600 dark:text-blue-400",
     bgLight: "bg-blue-50 hover:bg-blue-100",
     bgDark: "dark:bg-blue-950/40 dark:hover:bg-blue-900/40",
@@ -55,7 +55,7 @@ const CATEGORY_MAP: Record<string, CategoryMeta> = {
     description: "I capi essenziali per il tuo guardaroba",
   },
   jeans: {
-    icon: Tag,
+    icon: PiPantsBold,
     color: "text-indigo-600 dark:text-indigo-400",
     bgLight: "bg-indigo-50 hover:bg-indigo-100",
     bgDark: "dark:bg-indigo-950/40 dark:hover:bg-indigo-900/40",
@@ -63,7 +63,7 @@ const CATEGORY_MAP: Record<string, CategoryMeta> = {
     description: "Denim resistente, vestibilità moderna",
   },
   camicie: {
-    icon: ShoppingBag,
+    icon: PiShirtFoldedBold,
     color: "text-rose-600 dark:text-rose-400",
     bgLight: "bg-rose-50 hover:bg-rose-100",
     bgDark: "dark:bg-rose-950/40 dark:hover:bg-rose-900/40",
@@ -71,7 +71,7 @@ const CATEGORY_MAP: Record<string, CategoryMeta> = {
     description: "Eleganza formale e casual raffinato",
   },
   scarpe: {
-    icon: Footprints,
+    icon: PiSneakerBold,
     color: "text-cyan-600 dark:text-cyan-400",
     bgLight: "bg-cyan-50 hover:bg-cyan-100",
     bgDark: "dark:bg-cyan-950/40 dark:hover:bg-cyan-900/40",
@@ -79,7 +79,7 @@ const CATEGORY_MAP: Record<string, CategoryMeta> = {
     description: "Sneakers e calzature per ogni passo",
   },
   accessori: {
-    icon: Watch,
+    icon: PiWatchBold,
     color: "text-teal-600 dark:text-teal-400",
     bgLight: "bg-teal-50 hover:bg-teal-100",
     bgDark: "dark:bg-teal-950/40 dark:hover:bg-teal-900/40",
@@ -87,7 +87,7 @@ const CATEGORY_MAP: Record<string, CategoryMeta> = {
     description: "I dettagli che completano il tuo stile",
   },
   occhiali: {
-    icon: Glasses,
+    icon: PiSunglassesBold,
     color: "text-fuchsia-600 dark:text-fuchsia-400",
     bgLight: "bg-fuchsia-50 hover:bg-fuchsia-100",
     bgDark: "dark:bg-fuchsia-950/40 dark:hover:bg-fuchsia-900/40",
@@ -97,7 +97,7 @@ const CATEGORY_MAP: Record<string, CategoryMeta> = {
 };
 
 const DEFAULT_META: CategoryMeta = {
-  icon: Sparkles,
+  icon: PiSparkleBold,
   color: "text-indigo-600 dark:text-indigo-400",
   bgLight: "bg-indigo-50 hover:bg-indigo-100",
   bgDark: "dark:bg-indigo-950/40 dark:hover:bg-indigo-900/40",
