@@ -11,6 +11,7 @@ import { CombinedProductFormSchema, insertProductschema, updateProductSchema } f
 import { Product } from "@/types";
 import { useRouter } from "next/navigation";
 import {
+  Resolver,
   SubmitHandler,
   useForm,
 } from "react-hook-form";
@@ -80,10 +81,9 @@ const ProductForm = ({
           stock: productDefaultValues.stock || 0,
         };
 
-  // 3. useForm con il tipo unico e resolver specifico
+  // 3. useForm \con il tipo unico e resolver specifico
   const form = useForm<FormSchemaType>({
-    // ⭐️ FIX: Cast the resolver to match FormSchemaType to resolve type mismatch
-    resolver: zodResolver(schema) as any, 
+    resolver: zodResolver(schema) as Resolver<FormSchemaType>, 
     defaultValues: defaultValues,
   });
 
@@ -110,9 +110,8 @@ const ProductForm = ({
     let res;
     
     if (type === "Create") {
-      // ⭐️ FIX: Per la creazione, togliamo l'ID opzionale presente in FormSchemaType
-      const { id, ...createValues } = values; 
-      // Castiamo solo al tipo necessario per l'Action
+      const createValues = { ...values };
+      delete createValues.id;
       res = await createProduct(createValues as InsertSchemaType); 
     } else {
       // Per l'aggiornamento, l'ID è richiesto e garantito dal `defaultValues` (almeno nella logica)
@@ -124,7 +123,7 @@ const ProductForm = ({
       toast({ variant: "destructive", description: res.message });
     } else {
       toast({ description: res.message });
-      router.push("/admin/products");
+      router.push("/dashboard/admin/products");
     }
   };
 
@@ -343,7 +342,7 @@ const ProductForm = ({
                 <FormItem className="w-full">
                   <FormLabel>Immagini Prodotto</FormLabel>
                   <FormDescription className="mb-2">
-                    Carica fino a 5 immagini. Clicca su un'immagine per
+                    Carica fino a 5 immagini. Clicca su un&apos;immagine per
                     rimuoverla.
                   </FormDescription>
                   <Card>
@@ -456,7 +455,7 @@ const ProductForm = ({
                         </FormLabel>
                         <FormDescription>
                           Seleziona per mostrare questo prodotto nella sezione
-                          "In Vetrina" del tuo negozio.
+                          &quot;In Vetrina&quot; del tuo negozio.
                         </FormDescription>
                       </div>
                       <FormMessage />

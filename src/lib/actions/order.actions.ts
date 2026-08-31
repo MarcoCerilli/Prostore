@@ -4,8 +4,10 @@ import prisma from "@/db/prisma";
 import { auth } from "@/auth";
 import { orderStatus, Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
-import { OrderSummary, OrderItem } from "@/types/order";
+import { OrderSummary } from "@/types/order";
+import { CartItemFrontend, Order, shippingAddress } from "@/types";
 import { sendPurchaseReceiptEmail } from "../email";
+import { revalidatePath } from "next/cache";
 
 // --- Tipizzazione per l'Aggiornamento Post-Stripe ---
 interface UpdateOrderAfterStripeParams {
@@ -24,7 +26,7 @@ interface CreateOrderParams {
   taxPrice: number;
   paymentMethod?: string;
   shippingAddress: Prisma.InputJsonValue;
-  items: any[];
+  items: CartItemFrontend[];
 }
 
 // --- Tipo di Ritorno per createOrderAction ---
@@ -181,12 +183,12 @@ export async function createOrderAction({
               ...item,
               price: item.price.toNumber(),
             })),
-            shippingAddress: fullOrder.shippingAddress as any,
+            shippingAddress: fullOrder.shippingAddress as unknown as shippingAddress,
           };
 
           try {
             // 3. Invio Email
-            await sendPurchaseReceiptEmail({ order: orderForEmail as any });
+            await sendPurchaseReceiptEmail({ order: orderForEmail as unknown as Order });
             console.log(
               `✅ Email Contrassegno (riutilizzo) inviata per ordine ${recentOrder.id}`
             );
@@ -320,12 +322,12 @@ export async function createOrderAction({
             ...item,
             price: item.price.toNumber(),
           })),
-          shippingAddress: fullOrder.shippingAddress as any,
+          shippingAddress: fullOrder.shippingAddress as unknown as shippingAddress,
         };
 
         try {
           // 3. Invio Email
-          await sendPurchaseReceiptEmail({ order: orderForEmail as any });
+          await sendPurchaseReceiptEmail({ order: orderForEmail as unknown as Order });
           console.log(
             `✅ Email Contrassegno inviata per ordine ${newOrder.id}`
           );
@@ -359,7 +361,10 @@ export async function createOrderAction({
     };
   } catch (error) {
     console.error("❌ ERRORE createOrderAction:", error);
-    if ((error as any).code === "P2003") {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2003"
+    ) {
       return {
         success: false,
         error: "Errore Utente: Fai logout e login per aggiornare il database.",
@@ -397,6 +402,22 @@ export async function updateOrderAfterStripeSuccess({
       },
     });
 
+    // Decremento dello stock per ogni articolo acquistato
+    for (const item of updatedOrder.OrderItem) {
+      try {
+        await prisma.product.update({
+          where: { id: item.productId },
+          data: {
+            stock: {
+              decrement: item.qty,
+            },
+          },
+        });
+      } catch (stockErr) {
+        console.error(`Impossibile decrementare stock per prodotto ${item.productId}:`, stockErr);
+      }
+    }
+
     // 2. Mappatura e Conversione dei Dati
     const orderForEmail = {
       ...updatedOrder,
@@ -405,13 +426,13 @@ export async function updateOrderAfterStripeSuccess({
       shippingPrice: updatedOrder.shippingPrice.toNumber(),
       taxPrice: updatedOrder.taxPrice.toNumber(),
 
-      // Mappa e coverti gli articoli
+      // Mappa e converti gli articoli
       orderItems: updatedOrder.OrderItem.map((item) => ({
         ...item,
         price: item.price.toNumber(), // Decimal -> Number
       })),
 
-      shippingAddress: updatedOrder.shippingAddress as any,
+      shippingAddress: updatedOrder.shippingAddress as unknown as shippingAddress,
     };
 
     // 🛑 LOG DI VERIFICA DEI DATI UTENTE
@@ -422,18 +443,18 @@ export async function updateOrderAfterStripeSuccess({
       itemCount: orderForEmail.orderItems.length,
     });
 
-    // 3. 📧 INVIA L'EMAIL DI RICEVUTA (CORREZIONE CRITICA: USARE await)
+    // 3. 📧 INVIA L'EMAIL DI RICEVUTA
     try {
-      // 🔑 Passiamo l'oggetto orderForEmail all'interno di un oggetto { order: ... }
-      await sendPurchaseReceiptEmail({ order: orderForEmail as any });
+      await sendPurchaseReceiptEmail({ order: orderForEmail as unknown as Order });
       console.log(`✅ Email ricevuta per Ordine ${orderId} inviata.`);
     } catch (e) {
-      // Catturiamo solo l'errore di invio, senza bloccare l'aggiornamento DB
       console.error("⚠️ Errore CRITICO nell'invio email DOPO il pagamento:", e);
     }
 
-    // 4. Svuotamento carrello e revalidate
-    // ... AGGIUNGI QUI LOGICA PER SVUOTARE CARRELLO E REVALIDATE ...
+    revalidatePath(`/order/${orderId}`);
+    revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/admin/orders");
+    revalidatePath("/dashboard/admin/products");
 
     return { success: true, orderId: updatedOrder.id };
   } catch (error) {
@@ -443,7 +464,7 @@ export async function updateOrderAfterStripeSuccess({
 }
 
 // =============================================================
-// ## 3. updateOrderAfterPayPalSuccess (QUELLA CHE MANCAVA!) 🅿️
+// ## 3. updateOrderAfterPayPalSuccess 🅿️
 // =============================================================
 export async function updateOrderAfterPayPalSuccess(
   orderId: string,
@@ -460,8 +481,6 @@ export async function updateOrderAfterPayPalSuccess(
         isPaid: true,
         paidAt: new Date(),
         paymentmethod: "PayPal",
-        // Salviamo l'ID transazione di PayPal nel campo stripePaymentIntentId
-        // (o in un campo dedicato se lo hai aggiunto al DB, es. paypalOrderId)
         stripePaymentIntentId: paypalTransactionId,
         status: orderStatus.PAID,
       },
@@ -470,6 +489,22 @@ export async function updateOrderAfterPayPalSuccess(
         OrderItem: true,
       },
     });
+
+    // Decremento dello stock per ogni articolo acquistato
+    for (const item of updatedOrder.OrderItem) {
+      try {
+        await prisma.product.update({
+          where: { id: item.productId },
+          data: {
+            stock: {
+              decrement: item.qty,
+            },
+          },
+        });
+      } catch (stockErr) {
+        console.error(`Impossibile decrementare stock per prodotto ${item.productId}:`, stockErr);
+      }
+    }
 
     // Preparazione dati Email
     const orderForEmail = {
@@ -482,16 +517,21 @@ export async function updateOrderAfterPayPalSuccess(
         ...item,
         price: item.price.toNumber(),
       })),
-      shippingAddress: updatedOrder.shippingAddress as any,
+      shippingAddress: updatedOrder.shippingAddress as unknown as shippingAddress,
     };
 
     // Invio Email
     try {
-      await sendPurchaseReceiptEmail({ order: orderForEmail as any });
+      await sendPurchaseReceiptEmail({ order: orderForEmail as unknown as Order });
       console.log(`✅ Email PayPal inviata per ordine ${orderId}`);
     } catch (e) {
       console.error("⚠️ Errore invio email PayPal:", e);
     }
+
+    revalidatePath(`/order/${orderId}`);
+    revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/admin/orders");
+    revalidatePath("/dashboard/admin/products");
 
     return { success: true };
   } catch (error) {

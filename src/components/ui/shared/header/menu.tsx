@@ -1,99 +1,137 @@
-// 📁 File: src/components/ui/shared/header/menu.tsx
-"use client"; // Necessario per usare useSession()
+"use client";
 
-import { EllipsisVertical, ShoppingCart, User, Package, ListOrdered } from "lucide-react"; // Aggiungi ListOrdered
+import {
+  EllipsisVertical,
+  ShoppingCart,
+  User,
+  Package,
+  ShieldCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModeToggle from "./mode-toggle";
 import Link from "next/link";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "../../sheet"; // SheetDescription non necessaria
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "../../sheet";
 import UserButton from "./user-button";
-import { useSession } from "next-auth/react"; // ⭐ IMPORTAZIONE FONDAMENTALE
+import { useSession } from "next-auth/react";
 
-const Menu = () => {
-    // ⭐ 1. RECUPERA LO STATO E IL RUOLO DALLA SESSIONE
-    const { data: session, status } = useSession();
-    const isAuthenticated = status === 'authenticated';
-    const isAdmin = isAuthenticated && session?.user?.role === 'ADMIN';
+const Menu = ({ cartCount = 0 }: { cartCount?: number }) => {
+  const { data: session, status } = useSession();
+  const isAuthenticated = status === "authenticated";
+  const userRole = session?.user?.role?.toLowerCase();
+  const isAdmin = isAuthenticated && userRole === "admin";
 
-    // 2. Definisce i link della dashboard standard
-    let dashboardLinks = [
-        { href: "/dashboard/profile", label: "Il Mio Profilo", icon: User },
-        { href: "/dashboard/orders", label: "I Miei Ordini", icon: Package },
-    ];
-    
-    // ⭐ 3. AGGIUNGI IL LINK ADMIN SOLO SE L'UTENTE È ADMIN (Per il menu mobile)
-    if (isAdmin) {
-        dashboardLinks.unshift(
-            { href: "/admin/orders", label: "Gestione Ordini (Admin)", icon: ListOrdered }
-        );
-    }
-    
-    // La logica Desktop e Mobile ora si basa sullo stesso stato 'isAdmin' / 'isAuthenticated'
+  const dashboardLinks = [
+    { href: "/dashboard/profile", label: "Il Mio Profilo", icon: User },
+    { href: "/dashboard/orders", label: "I Miei Ordini", icon: Package },
+  ];
 
-    return (
-        <div className="flex justify-end gap-3">
-            {/* Navigazione Desktop */}
-            <nav className="hidden md:flex w-full max-w-xs gap-1 items-center">
-                <ModeToggle />
-                
-                {/* ⭐ AGGIUNGI QUI IL PULSANTE ORDINI ADMIN (VISTA DESKTOP) */}
-                {isAdmin && (
-                    <Button asChild variant="ghost" className="flex items-center p-2">
-                        <Link href="/admin/orders">
-                            <ListOrdered className="w-5 h-5" />
-                        </Link>
-                    </Button>
+  if (isAdmin) {
+    dashboardLinks.unshift({
+      href: "/dashboard/admin",
+      label: "Pannello Admin",
+      icon: ShieldCheck,
+    });
+  }
+
+  return (
+    <div className="flex justify-end gap-2 sm:gap-3 items-center">
+      {/* Navigazione Desktop */}
+      <nav className="hidden md:flex w-full max-w-xs gap-2 items-center">
+        <ModeToggle />
+
+        {isAdmin && (
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="flex items-center text-indigo-600 dark:text-indigo-400 font-medium"
+          >
+            <Link href="/dashboard/admin" title="Pannello Amministrazione">
+              <ShieldCheck className="w-5 h-5" />
+            </Link>
+          </Button>
+        )}
+
+        <Button asChild variant="ghost" size="icon" className="relative">
+          <Link href="/cart" aria-label="Carrello">
+            <ShoppingCart className="w-5 h-5" />
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-indigo-600 text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center shadow-xs">
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
+          </Link>
+        </Button>
+        <UserButton />
+      </nav>
+
+      {/* Navigazione Mobile */}
+      <nav className="md:hidden flex items-center gap-1">
+        <Button asChild variant="ghost" size="icon" className="relative">
+          <Link href="/cart" aria-label="Carrello">
+            <ShoppingCart className="w-5 h-5" />
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-indigo-600 text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center shadow-xs">
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
+          </Link>
+        </Button>
+
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Apri Menu">
+              <EllipsisVertical className="w-5 h-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="flex flex-col items-start pt-8 space-y-4">
+            <SheetTitle className="self-center font-bold text-lg">Menu</SheetTitle>
+
+            <div className="w-full flex items-center justify-between border-b pb-3">
+              <span className="text-sm text-muted-foreground">Tema</span>
+              <ModeToggle />
+            </div>
+
+            <Button asChild variant="ghost" className="w-full justify-between text-base">
+              <Link href="/cart" className="flex items-center justify-between w-full">
+                <div className="flex items-center">
+                  <ShoppingCart className="w-5 h-5 mr-3 text-indigo-600 dark:text-indigo-400" />
+                  <span>Carrello</span>
+                </div>
+                {cartCount > 0 && (
+                  <span className="bg-indigo-600 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                    {cartCount}
+                  </span>
                 )}
-                
-                <Button asChild variant="ghost">
-                    <Link href="/cart">
-                        <ShoppingCart className="w-5 h-5" />
-                    </Link>
-                </Button>
-                <UserButton/>
-            </nav>
+              </Link>
+            </Button>
 
-            {/* Navigazione Mobile */}
-            <nav className="md:hidden"> 
-                <Sheet>
-                    <SheetTrigger asChild>
-                         <Button variant="ghost" size="icon">
-                            <EllipsisVertical />
-                         </Button>
-                    </SheetTrigger>
-                    <SheetContent className="flex flex-col items-start pt-10">
-                        <SheetTitle className="self-center">Menu</SheetTitle>
-                        
-                        {/* Contenuti statici (ModeToggle, Carrello) */}
-                        <ModeToggle />
-                        <Button asChild variant="ghost" className="w-full justify-start">
-                            <Link href="/cart" className="flex items-center">
-                                <ShoppingCart className="w-5 h-5 mr-2"/> Carrello
-                            </Link>
-                        </Button>
-                        
-                        {/* ⭐ BLOCCO: Link Dashboard (inclusi Admin) */}
-                        {isAuthenticated && (
-                            <>
-                                {dashboardLinks.map(item => (
-                                    <Button key={item.href} asChild variant="ghost" className="w-full justify-start">
-                                        <Link href={item.href} className="flex items-center">
-                                            <item.icon className="w-5 h-5 mr-2" />
-                                            {item.label}
-                                        </Link>
-                                    </Button>
-                                ))}
-                            </>
-                        )}
-                        {/* FINE BLOCCO */}
-                        
-                        <UserButton/>
-                        
-                    </SheetContent>
-                </Sheet>
-            </nav>
-        </div>
-    );
+            {isAuthenticated && (
+              <div className="w-full space-y-1 border-t pt-3">
+                {dashboardLinks.map((item) => (
+                  <Button
+                    key={item.href}
+                    asChild
+                    variant="ghost"
+                    className="w-full justify-start text-base"
+                  >
+                    <Link href={item.href} className="flex items-center">
+                      <item.icon className="w-5 h-5 mr-3 text-indigo-600 dark:text-indigo-400" />
+                      {item.label}
+                    </Link>
+                  </Button>
+                ))}
+              </div>
+            )}
+
+            <div className="w-full border-t pt-4">
+              <UserButton />
+            </div>
+          </SheetContent>
+        </Sheet>
+      </nav>
+    </div>
+  );
 };
 
 export default Menu;

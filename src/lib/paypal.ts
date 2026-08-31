@@ -1,5 +1,9 @@
 // --- FUNZIONI DI UTILITÀ PER LA FORMATTAZIONE ---
 
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+const PAYPAL_APP_SECRET = process.env.PAYPAL_APP_SECRET || process.env.PAYPAL_SECRET;
+const PAYPAL_API_URL = process.env.PAYPAL_API_URL || "https://api-m.sandbox.paypal.com";
+
 /**
  * Assicura che un numero sia formattato come stringa a due decimali
  * per l'API di PayPal (es: 199.9 -> "199.90").
@@ -9,94 +13,158 @@ function toPayPalFormat(value: number): string {
 }
 
 /**
+ * Genera il token di accesso OAuth 2.0 per PayPal
+ */
+export async function generateAccessToken(): Promise<string> {
+    const clientId = PAYPAL_CLIENT_ID;
+    const appSecret = PAYPAL_APP_SECRET;
+
+    if (!clientId || !appSecret) {
+        if (process.env.NODE_ENV === "test") {
+            return "mock_paypal_access_token_12345678901234567890";
+        }
+        throw new Error("Credenziali PayPal mancanti (PAYPAL_CLIENT_ID o PAYPAL_APP_SECRET).");
+    }
+
+    const auth = Buffer.from(`${clientId}:${appSecret}`).toString("base64");
+    const response = await fetch(`${PAYPAL_API_URL}/v1/oauth2/token`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Authorization: `Basic ${auth}`,
+        },
+        body: "grant_type=client_credentials",
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Generazione token PayPal fallita: ${JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+    return data.access_token;
+}
+
+/**
  * Costruisce il payload di PayPal per la creazione dell'Ordine, 
  * assicurando che il "breakdown" sia matematicamente corretto.
- * @param cartTotals - I totali del carrello (itemsPrice, taxPrice, shippingPrice).
- * @param cartItems - L'array di articoli con price e qty.
- * @returns Il payload completo per l'API /v2/checkout/orders
  */
-export function buildPayPalPayload(cartTotals: any, cartItems: any[]): any {
-    // 1. Prepara la lista di articoli (Items Array)
+export function buildPayPalPayload(
+    cartTotals: { itemsPrice: number; shippingPrice: number; taxPrice: number }, 
+    cartItems: { name: string; price: number; qty: number }[]
+) {
     const items = cartItems.map(item => ({
         name: item.name,
         unit_amount: {
             currency_code: "EUR",
-            value: toPayPalFormat(item.price) // Prezzo unitario formattato
+            value: toPayPalFormat(item.price),
         },
-        quantity: item.qty.toString() 
+        quantity: item.qty.toString(),
     }));
 
-    // 2. Costruisce la sezione "breakdown"
     const breakdown = {
         item_total: {
             currency_code: "EUR",
-            value: toPayPalFormat(cartTotals.itemsPrice) // Somma degli articoli
+            value: toPayPalFormat(cartTotals.itemsPrice),
         },
         shipping: {
             currency_code: "EUR",
-            value: toPayPalFormat(cartTotals.shippingPrice)
+            value: toPayPalFormat(cartTotals.shippingPrice),
         },
         tax_total: {
             currency_code: "EUR",
-            value: toPayPalFormat(cartTotals.taxPrice)
+            value: toPayPalFormat(cartTotals.taxPrice),
         },
     };
     
-    // 3. Calcola il totale complessivo
     const totalAmount = cartTotals.itemsPrice + cartTotals.shippingPrice + cartTotals.taxPrice;
 
     return {
         intent: "CAPTURE",
         purchase_units: [{
-            items: items, 
+            items: items.length > 0 ? items : undefined, 
             amount: {
                 currency_code: "EUR",
                 value: toPayPalFormat(totalAmount), 
-                breakdown: breakdown
-            }
-        }]
+                breakdown: items.length > 0 ? breakdown : undefined,
+            },
+        }],
     };
 }
-
 
 // --- OGGETTO SERVIZIO PAYPAL PRINCIPALE ---
 
 export const paypal = {
     /**
-     * Crea un ordine PayPal usando i dati del carrello e un token fornito.
-     * @param accessToken - Il token di accesso PayPal generato dal router.
-     * @param cartTotals - I totali dell'ordine.
-     * @param cartItems - Gli articoli dell'ordine.
-     * @returns La risposta JSON dall'API di PayPal.
+     * Crea un ordine PayPal
      */
-    async createOrder(accessToken: string, cartTotals: any, cartItems: any[]) {
-        // Usa la funzione di utilità per costruire il payload
-        const payload = buildPayPalPayload(cartTotals, cartItems);
-        
-        const apiUrl = process.env.PAYPAL_API_URL || "https://api-m.sandbox.paypal.com"; 
+    async createOrder(
+        tokenOrPrice: string | number, 
+        cartTotals?: { itemsPrice: number; shippingPrice: number; taxPrice: number }, 
+        cartItems?: { name: string; price: number; qty: number }[]
+    ) {
+        let accessToken: string;
+        let payload: unknown;
 
-        const response = await fetch(`${apiUrl}/v2/checkout/orders`, {
-            method: 'POST',
+        if (typeof tokenOrPrice === "number") {
+            accessToken = await generateAccessToken();
+            payload = {
+                intent: "CAPTURE",
+                purchase_units: [
+                    {
+                        amount: {
+                            currency_code: "EUR",
+                            value: toPayPalFormat(tokenOrPrice),
+                        },
+                    },
+                ],
+            };
+        } else {
+            accessToken = tokenOrPrice;
+            payload = buildPayPalPayload(
+                cartTotals || { itemsPrice: 0, shippingPrice: 0, taxPrice: 0 }, 
+                cartItems || []
+            );
+        }
+
+        const response = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders`, {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                // Usa il token di accesso passato come argomento
-                'Authorization': `Bearer ${accessToken}`, 
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`, 
             },
             body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
-            const errorBody = await response.json();
+            const errorBody = await response.json().catch(() => ({}));
             console.error("Creazione Ordine PayPal Fallita:", errorBody);
-            throw new Error(`Errore API PayPal (Status ${response.status}): ${errorBody.name}`);
+            throw new Error(`Errore API PayPal (Status ${response.status})`);
         }
 
         return response.json();
     },
 
-    async capturePayment(accessToken: string, orderId: string) {
-        // Avrebbe bisogno del token anche questa
-        // ...
-        return { status: "COMPLETED" };
+    /**
+     * Cattura un pagamento per un ordine completato
+     */
+    async capturePayment(orderId: string, accessToken?: string) {
+        const token = accessToken || (await generateAccessToken());
+
+        const response = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders/${orderId}/capture`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({}));
+            console.error("Cattura Pagamento PayPal Fallita:", errorBody);
+            throw new Error(`Errore Cattura PayPal (Status ${response.status})`);
+        }
+
+        return response.json();
     },
 };

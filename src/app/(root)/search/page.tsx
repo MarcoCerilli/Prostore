@@ -7,6 +7,8 @@ import Link from "next/link";
 import SortSelect from "@/components/ui/search/SortSelect";
 import RatingStars from "@/components/ui/search/RatingStars";
 import ProductPagination from "@/components/ui/search/ProductPagination";
+import { getCategoryMeta } from "@/lib/category-config";
+import { Sparkles } from "lucide-react";
 
 // --- Dati Statici per i Filtri ---
 const prices = [
@@ -150,32 +152,65 @@ const SearchPage = async (props: {
         {/* -------------------- 1. COLONNA FILTRI (SIDEBAR) -------------------- */}
         <div className="md:col-span-1 border-r md:pr-4">
           {/* Filtri Categorie */}
-          <div className="text-xl mb-4 mt-3 font-semibold">Categorie</div>
-          <ul className="space-y-2">
+          <div className="text-lg mb-3 mt-3 font-bold tracking-tight">Categorie</div>
+          <ul className="space-y-1.5">
             {/* Link "Tutte" */}
             <li>
               <Link
-                className={`${category === "all" || category === "" ? "font-bold text-indigo-600" : "hover:text-indigo-600"}`}
+                className={`flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all duration-200 ${
+                  category === "all" || category === ""
+                    ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-semibold border border-indigo-200/60 dark:border-indigo-800/60"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+                }`}
                 href={getFilterUrl({ c: "all" })}
               >
-                Tutte
+                <div className="flex items-center gap-2.5 truncate">
+                  <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                  <span className="truncate">Tutte</span>
+                </div>
               </Link>
             </li>
 
-            {/* 🛑 MAPPATURA DELLE CATEGORIE (ORA VISIBILE) 🛑 */}
+            {/* Mappatura delle Categorie */}
             {uniqueCategories.map((c) => {
-              // Estraiamo i dati in modo sicuro
               const cSlug = c.slug;
               const cName = c.name;
+              const meta = getCategoryMeta(cSlug || cName);
+              const Icon = meta.icon;
+              const isActive = category === cSlug;
 
               return (
                 <li key={cSlug}>
                   <Link
-                    className={`${category === cSlug ? "font-bold text-indigo-600" : "hover:text-indigo-600"}`}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all duration-200 ${
+                      isActive
+                        ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-semibold border border-indigo-200/60 dark:border-indigo-800/60"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+                    }`}
                     href={getFilterUrl({ c: cSlug })}
                   >
-                    {cName} {c._count ? `(${c._count})` : ""}{" "}
-                    {/* Mostra conteggio se disponibile */}
+                    <div className="flex items-center gap-2.5 truncate min-w-0">
+                      <Icon
+                        className={`w-4 h-4 flex-shrink-0 ${
+                          isActive
+                            ? "text-indigo-600 dark:text-indigo-400"
+                            : meta.color
+                        }`}
+                      />
+                      <span className="truncate">{cName}</span>
+                    </div>
+
+                    {typeof c._count === "number" && (
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ml-1.5 ${
+                          isActive
+                            ? "bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300"
+                            : "bg-muted text-muted-foreground border border-border/40"
+                        }`}
+                      >
+                        {c._count}
+                      </span>
+                    )}
                   </Link>
                 </li>
               );

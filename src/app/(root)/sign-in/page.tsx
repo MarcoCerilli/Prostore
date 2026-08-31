@@ -23,20 +23,12 @@ export const metadata: Metadata = {
 const SignInPage = async ({
   searchParams,
 }: {
-  searchParams: {
-    callbackUrl?: string; // Può essere opzionale
-  };
+  searchParams: Promise<{
+    callbackUrl?: string;
+  }>;
 }) => {
- 
-     // ✅ CORREZIONE CRITICA PER ERRORE PROMISE
-  // Nel tuo ambiente, i searchParams sono trattati come un oggetto Promise.
-  // Usiamo l'await per forzare la risoluzione del Promise (tipo Next.js 13/14).
-  // Nota: Dobbiamo usare 'as any' qui perché TypeScript non si aspetta 'await' su questo tipo.
-  const resolvedSearchParams = await (searchParams as any);
-  
-  // 1. LEGGI IL CALLBACK URL PER LA LOGICA DI REINDIRIZZAMENTO DELLA SESSIONE
-  // Manteniamo la lettura da resolvedSearchParams per gestire il caso "utente già loggato"
-  const sessionCallbackUrl = resolvedSearchParams.callbackUrl || "/";
+  const resolvedSearchParams = await searchParams;
+  const sessionCallbackUrl = resolvedSearchParams?.callbackUrl || "/";
 
 
    
@@ -47,13 +39,13 @@ const SignInPage = async ({
   // 3. LOGICA DI REINDIRIZZAMENTO:
   if (session) {
     // Se l'utente è già loggato come ADMIN, lo mandiamo direttamente all'area admin.
-    if (session.user.role === 'admin') {
-        return redirect("/admin/orders");
+    if (session.user.role?.toLowerCase() === 'admin') {
+      return redirect("/dashboard/admin");
     }
-   if (sessionCallbackUrl === '/') {
-        return redirect("/"); // Reindirizza a Home se non c'è un target specifico
+    if (sessionCallbackUrl === '/') {
+      return redirect("/");
     } else {
-        return redirect(sessionCallbackUrl); // Torna alla pagina protetta
+      return redirect(sessionCallbackUrl);
     }
   }
 

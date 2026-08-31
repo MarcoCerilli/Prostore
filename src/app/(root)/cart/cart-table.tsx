@@ -9,6 +9,11 @@ import { ArrowRight, Loader, Minus, Plus, Trash2 } from "lucide-react";
 // ✅ Importiamo i tipi corretti dal tuo file di tipizzazioni
 import { Cart, BackendCartItem } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import {
+  PaymentBadgesList,
+  InstallmentBanner,
+} from "@/components/ui/shared/payment-badges";
+import { ShieldCheck } from "lucide-react";
 
 // -----------------------------------------------------------------
 // 💡 NUOVA INTERFACCIA: Definiamo i campi che servono ad addItemToCart
@@ -236,43 +241,63 @@ const CartTable = ({ cart }: { cart?: Cart | null }) => {
       </div>
 
       {/* Riepilogo Totale */}
-      <div className="mt-12 p-6 bg-gray-50 rounded-lg shadow-lg">
-        {/* ... (Riepilogo Totale invariato) */}
-        <h2 className="text-2xl font-bold mb-4 border-b pb-2">
+      <div className="mt-12 p-6 bg-card border border-border/60 rounded-2xl shadow-lg space-y-6">
+        <h2 className="text-2xl font-bold border-b border-border/40 pb-3 text-foreground">
           Riepilogo Ordine
         </h2>
 
-        <div className="space-y-2 text-gray-700">
+        <div className="space-y-2.5 text-muted-foreground text-sm sm:text-base">
           <div className="flex justify-between">
             <span>Subtotale Articoli:</span>
-            <span className="font-medium">
+            <span className="font-semibold text-foreground">
               €{formatCurrency(cart.itemsPrice)}
             </span>
           </div>
           <div className="flex justify-between">
             <span>Costi di Spedizione:</span>
-            <span className="font-medium">
-              €{formatCurrency(cart.shippingPrice)}
+            <span className="font-semibold text-foreground">
+              {cart.shippingPrice === 0 ? (
+                <span className="text-emerald-600 dark:text-emerald-400">Gratis</span>
+              ) : (
+                `€${formatCurrency(cart.shippingPrice)}`
+              )}
             </span>
           </div>
           <div className="flex justify-between">
-            <span>Tasse:</span>
-            <span className="font-medium">
+            <span>Tasse (IVA incl.):</span>
+            <span className="font-semibold text-foreground">
               €{formatCurrency(cart.taxPrice)}
             </span>
           </div>
-          <div className="flex justify-between pt-3 border-t border-gray-300 text-xl font-extrabold text-gray-900">
+          <div className="flex justify-between pt-4 border-t border-border/60 text-xl font-extrabold text-foreground">
             <span>Totale Ordine:</span>
-            <span>€{formatCurrency(cart.totalPrice)}</span>{" "}
+            <span className="text-indigo-600 dark:text-indigo-400">
+              €{formatCurrency(cart.totalPrice)}
+            </span>
           </div>
         </div>
 
+        {/* Banner Rateizzazione Klarna / PayPal */}
+        {cart.totalPrice >= 30 && (
+          <InstallmentBanner price={cart.totalPrice} />
+        )}
+
         <Link
           href="/checkout"
-className="mt-6 w-full flex justify-center items-center py-3 bg-indigo-600 text-white rounded-lg font-bold text-lg hover:bg-indigo-700 transition shadow-md"
+          className="w-full flex justify-center items-center py-3.5 px-6 bg-indigo-600 text-white rounded-xl font-bold text-base hover:bg-indigo-700 shadow-md shadow-indigo-600/20 transition-all duration-200 group"
         >
-          Procedi al Checkout <ArrowRight className="h-5 w-5 ml-2" />
+          <span>Procedi al Checkout</span>
+          <ArrowRight className="h-5 w-5 ml-2 transition-transform group-hover:translate-x-1" />
         </Link>
+
+        {/* Metodi di pagamento & Sicurezza */}
+        <div className="pt-4 border-t border-border/40 space-y-2">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Checkout sicuro con crittografia SSL</span>
+          </div>
+          <PaymentBadgesList />
+        </div>
       </div>
     </div>
   );

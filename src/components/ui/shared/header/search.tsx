@@ -1,74 +1,74 @@
 "use client";
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Search as SearchIcon } from "lucide-react";
 
-// NOTA: Se la tua funzione getAllCategories è stata aggiornata, potrebbe restituire 'name' e 'slug'
-// anziché 'category' e '_count'. Assumo qui il formato che stai mappando.
-
-interface CategoryItem {
-  category: string; // Il nome grezzo (da usare come chiave di de-duplicazione)
-  slug?: string; // Lo slug (se disponibile dalla fetch, altrimenti lo generiamo)
-  _count: number;
+export interface CategoryItem {
+  name: string;
+  slug: string;
+  _count?: number;
 }
-
-// Funzione helper per creare uno slug (copiata da quella suggerita per getAllCategories)
-function createSlug(text: string): string {
-    return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-}
-
 
 const Search = ({ categories }: { categories: CategoryItem[] }) => {
+  const uniqueCategoriesMap = new Map<string, CategoryItem>();
 
-    const uniqueCategoriesMap = new Map<string, CategoryItem>();
-    
-    // Filtriamo e deduplichiamo
-    categories.forEach(cat => {
-      if (cat.category && !uniqueCategoriesMap.has(cat.category)) {
-          // Aggiungiamo lo slug se mancante
-          if (!cat.slug) {
-              cat.slug = createSlug(cat.category);
-          }
-          uniqueCategoriesMap.set(cat.category, cat);
-      }
-    });
+  categories.forEach((cat) => {
+    const key = cat.slug || cat.name;
+    if (key && !uniqueCategoriesMap.has(key)) {
+      uniqueCategoriesMap.set(key, cat);
+    }
+  });
 
-    const uniqueCategories = Array.from(uniqueCategoriesMap.values());
+  const uniqueCategories = Array.from(uniqueCategoriesMap.values());
 
   return (
-    <form action="/search" method="GET">
-      <div className="flex w-full items-center space-x-2">
-        
+    <form action="/search" method="GET" className="w-full">
+      <div className="flex w-full items-center gap-1.5 p-1 rounded-2xl border border-border/60 bg-muted/40 dark:bg-zinc-900/60 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all shadow-xs">
         {/* Campo Categoria */}
-        <Select name="category">
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Tutte le Categorie" />
+        <Select name="category" defaultValue="all">
+          <SelectTrigger className="w-[130px] sm:w-[150px] border-0 bg-transparent text-xs sm:text-sm font-medium focus:ring-0 shadow-none h-9">
+            <SelectValue placeholder="Tutte" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="rounded-xl">
             <SelectItem value="all">Tutte le Categorie</SelectItem>
             {uniqueCategories.map((cat) => (
-              // 🛑 USA LO SLUG COME VALORE DI RICERCA
-              <SelectItem key={cat.category} value={cat.slug || cat.category}> 
-                {cat.category}
+              <SelectItem key={cat.slug} value={cat.slug}>
+                {cat.name}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        
-        {/* Campo di input per la ricerca testuale */}
-        <Input type="text" name="query" placeholder="Cerca Prodotti..." className="w-full" />
-        
+
+        <div className="h-5 w-[1px] bg-border/80 my-auto" />
+
+        {/* Campo di input con Icona */}
+        <div className="relative flex-1 flex items-center">
+          <Input
+            type="text"
+            name="query"
+            placeholder="Cerca prodotti, brand, collezioni..."
+            className="w-full text-xs sm:text-sm border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-3 h-9 shadow-none"
+          />
+        </div>
+
         {/* Bottone Submit */}
-        <Button type="submit" className="bg-indigo-600 
-          hover:bg-indigo-700 
-          text-white 
-          font-bold 
-          py-2 
-          px-4 
-          rounded 
-          transition 
-          duration-150">Cerca</Button>
+        <Button
+          type="submit"
+          size="sm"
+          className="h-9 px-3 sm:px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 transition-all duration-200"
+          aria-label="Cerca"
+        >
+          <SearchIcon className="w-4 h-4" />
+          <span className="hidden sm:inline text-xs">Cerca</span>
+        </Button>
       </div>
     </form>
   );

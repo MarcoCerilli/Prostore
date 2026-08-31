@@ -126,7 +126,7 @@ export async function updateUserBaseData(
         } as any);
  */
     // 5. Invalida la cache
-    revalidatePath("/admin/users"); // Per aggiornare la tabella admin
+    revalidatePath("/dashboard/admin/users"); // Per aggiornare la tabella admin
     revalidatePath("/dashboard/profile"); // Per aggiornare il profilo
 
     return {
@@ -161,12 +161,13 @@ type UserProfileUpdatePayload = z.infer<typeof userProfileUpdateSchema>;
 // ----------------------------------------------------------------------
 
 // 💡 Funzione robusta per controllare l'errore di reindirizzamento
-const isNextRedirectError = (error: any) => {
+const isNextRedirectError = (error: unknown) => {
   return (
-    error &&
     typeof error === "object" &&
+    error !== null &&
     "digest" in error &&
-    error.digest?.includes("NEXT_REDIRECT")
+    typeof (error as { digest?: unknown }).digest === "string" &&
+    (error as { digest: string }).digest.includes("NEXT_REDIRECT")
   );
 };
 
@@ -202,7 +203,12 @@ export async function signInWithCredentials(
       throw error;
     }
 
-    if ((error as any).type === "CredentialsSignin") {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "type" in error &&
+      (error as { type: unknown }).type === "CredentialsSignin"
+    ) {
       return { success: false, message: "Password o Email non valida" };
     }
 
@@ -345,10 +351,7 @@ export async function saveShippingAddress(
 
   if (!validation.success) {
     const errors = validation.error.issues
-      .map(
-        (issue: { path: any[]; message: any }) =>
-          `${issue.path[0]}: ${issue.message}`
-      )
+      .map((issue) => `${String(issue.path[0])}: ${issue.message}`)
       .join(", ");
     throw new Error(`Errore di validazione: ${errors}`);
   }
@@ -402,7 +405,7 @@ export async function updateUserProfile(
   const newFullName = `${validatedData.firstName} ${validatedData.lastName}`;
 
   // 💡 Ottimizzazione: Estrazione esplicita dei dati per il campo JSON 'address'
-  const { firstName, lastName, ...addressData } = validatedData;
+  const { firstName: _firstName, lastName: _lastName, ...addressData } = validatedData;
 
   try {
     // 2. Aggiornamento nel database
@@ -433,7 +436,7 @@ export async function updateUserProfile(
         role: updatedUser.role,
       },
       update: true,
-    } as any); // Il cast 'as any' è spesso necessario qui
+    } as unknown as Record<string, unknown>);
 
     // 4. Invalida la cache per la pagina del profilo
     revalidatePath("/dashboard/profile");
@@ -530,7 +533,7 @@ export async function getOrderDetailsAction(orderId: string) {
       shippingPrice: Number(order.shippingPrice),
       taxPrice: Number(order.taxPrice),
       itemsPrice: Number(order.itemsPrice),
-      OrderItem: order.OrderItem.map((item: { price: any; }) => ({
+      OrderItem: order.OrderItem.map((item) => ({
         ...item,
         price: Number(item.price),
       })),
@@ -653,7 +656,7 @@ export async function getMyOrdersSummaryAction() {
     }); // 1. Conversione in array JavaScript per l'uso lato client.
     // 2. Assicuriamo che totalPrice sia un numero (se Prisma lo restituisce come Decimal).
 
-    const sanitizedOrders = orders.map((order: { orderNumber: any; createdAt: any; totalPrice: any; status: any; OrderItem: { image: any; }[]; }) => ({
+    const sanitizedOrders = orders.map((order) => ({
       orderNumber: order.orderNumber,
       createdAt: order.createdAt,
       totalPrice: Number(order.totalPrice), // ⭐ Conversione in Number
@@ -669,7 +672,7 @@ export async function getMyOrdersSummaryAction() {
 }
 
 // Questo tipo assicura che 'address' sia presente.
-export type FullUserProfile = Prisma.UserGetPayload<{}> & {
+export type FullUserProfile = Prisma.UserGetPayload<Prisma.UserDefaultArgs> & {
   // Rendiamo 'address' obbligatorio per la tipizzazione, anche se il valore può essere un oggetto vuoto
   address: Prisma.JsonValue; // Aggiungi qui anche gli altri campi richiesti dal tuo form se mancano (es. 'role')
   role: string | null;
@@ -761,7 +764,7 @@ export async function getAllUsers({
         });
 
         // 4. Conversione e Restituzione
-        const users = rawUsers.map((user: any) => convertToPlainObject(user));
+        const users = rawUsers.map((user) => convertToPlainObject(user));
 
         return {
             data: users as User[],
@@ -782,10 +785,10 @@ export async function getAllUsers({
 export async function deleteUser(id: string) {
   try {
     await prisma.user.delete({ where: { id } });
-    revalidatePath("/admin/users");
+    revalidatePath("/dashboard/admin/users");
     return { success: true, message: "Utente eliminato con successo." };
   } catch (error) {
-    return { success: false, message: formatError(error) };
+    return { success: false, message: await formatError(error) };
   }
 }
 
@@ -798,7 +801,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
 });
 
 // * DEFINIZIONE DEI TIPI DI RISPOSTA
-type PaymentStatusResponse = {
+export type PaymentStatusResponse = {
     status: 'SUCCESS' | 'FAILURE' | 'PENDING';
     message: string;
     orderNumber: string;
@@ -812,14 +815,14 @@ type PaymentStatusResponse = {
  * * Utilizza lo schema Prisma fornito dall'utente.
  * @param orderNumber Il numero dell'ordine (@unique) da aggiornare.
  * @param clientSecret Il client secret passato da Stripe per recuperare l'Intent.
- * @param redirectStatus Lo stato di reindirizzamento fornito da Stripe.
+ * @param _redirectStatus Lo stato di reindirizzamento fornito da Stripe.
  * @returns {Promise<PaymentStatusResponse>} L'oggetto contenente lo stato finale e il messaggio.
  */
 export async function getPaymentIntentStatusAction(
     orderNumber: string,
     clientSecret: string,
-    redirectStatus: string
-): Promise<any> { // Usando 'any' temporaneamente se il type PaymentStatusResponse non è fornito
+    _redirectStatus?: string
+): Promise<PaymentStatusResponse> {
     
     // Controlli preliminari
     if (!clientSecret || !orderNumber) {
@@ -845,11 +848,13 @@ export async function getPaymentIntentStatusAction(
         }
 
         // 2. Recupera il Payment Intent da Stripe (Server-side)
-        // Usiamo 'as any' per ignorare temporaneamente l'errore di tipizzazione sull'interfaccia Response<PaymentIntent>
-        // Questo è il modo più rapido per risolvere il problema 'charges'
-        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+        type PaymentIntentWithCharges = Stripe.PaymentIntent & {
+            charges?: Stripe.ApiList<Stripe.Charge>;
+        };
+
+        const paymentIntent = (await stripe.paymentIntents.retrieve(paymentIntentId, {
             expand: ['charges'] 
-        }) as any; // <-- CASTING QUI PER RISOLVERE IL PROBLEMA DELLE PROPRIETÀ
+        })) as PaymentIntentWithCharges;
 
         if (!paymentIntent) {
             return {

@@ -45,7 +45,7 @@ const UpdateUserForm = ({ user }: Props) => {
         description: res.message || "Utente aggiornato con successo!",
       });
       router.refresh(); 
-      router.push("/admin/users"); 
+      router.push("/dashboard/admin/users"); 
     }
   };
 

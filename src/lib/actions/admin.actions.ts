@@ -101,7 +101,7 @@ type OrderQueryResult = {
 export async function getAllOrdersSummaryAction(): Promise<FullOrderSummary[]> {
     const session = await auth();
 
-    if (!session || session.user.role !== 'admin') {
+    if (!session || session.user.role?.toLowerCase() !== 'admin') {
         redirect("/sign-in");
     } 
 
@@ -120,7 +120,6 @@ export async function getAllOrdersSummaryAction(): Promise<FullOrderSummary[]> {
             },
         }); 
 
-        // Mappatura: Mappa totalPrice su totalPrice (perché OrderSummary lo richiede)
         const sanitizedOrders: FullOrderSummary[] = orders.map((order) => ({
             id: order.id,
             orderNumber: order.orderNumber,
@@ -149,7 +148,7 @@ export async function getAllOrdersSummaryAction(): Promise<FullOrderSummary[]> {
 export async function deleteOrderAction(orderId: string) {
   try {
     await prisma.order.delete({ where: { id: orderId } });
-    revalidatePath("/admin/orders");
+    revalidatePath("/dashboard/admin/orders");
     return { success: true };
   } catch (error) {
     console.error("Errore eliminazione ordine:", error);
@@ -159,19 +158,14 @@ export async function deleteOrderAction(orderId: string) {
 
 // ✅ aggiorna lo stato dell’ordine
 export async function updateOrderStatusAction(orderId: string, newStatus: string) {
-    "use server";
-
-      console.log("🔄 Aggiornamento stato ordine:", orderId, "→", newStatus);
-
-
   try {
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
       data: { status: newStatus as orderStatus },
     });
-        console.log("✅ Ordine aggiornato con successo:", updatedOrder.id, updatedOrder.status);
+    console.log("✅ Ordine aggiornato con successo:", updatedOrder.id, updatedOrder.status);
 
-    revalidatePath("/admin/orders");
+    revalidatePath("/dashboard/admin/orders");
     return { success: true };
   } catch (error) {
     console.error("Errore aggiornamento ordine:", error);

@@ -1,13 +1,12 @@
-// src/components/ui/shared/header/HeaderWrapper.tsx 
 import { getAllCategories } from "@/lib/actions/product.actions";
-import Header from "./index"; // Importa il tuo Header Client
+import { getMyCart } from "@/lib/actions/cart.queries";
+import Header from "./index";
 
 export default async function HeaderWrapper() {
-    // 🛑 Esegui il fetch lato SERVER, dove è consentito
-    const categories = await getAllCategories(); 
+  const categories = await getAllCategories();
+  const cart = await getMyCart();
+  const cartCount =
+    cart?.items?.reduce((total, item) => total + (item.qty || 1), 0) || 0;
 
-    return (
-        // Passa i dati al Client Component
-        <Header categories={categories} />
-    );
+  return <Header categories={categories} cartCount={cartCount} />;
 }

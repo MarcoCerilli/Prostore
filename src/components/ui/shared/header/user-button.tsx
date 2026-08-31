@@ -1,8 +1,6 @@
-// 📁 components/ui/shared/header/user-button.tsx
-"use client"; // ⭐ ADESSO È UN CLIENT COMPONENT
+"use client";
 
 import Link from "next/link";
-// Importiamo useSession e signOut direttamente per i Client Component
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,30 +11,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-// ⭐ Importato ListOrdered per il link Admin
-import { UserIcon, LogOut, Package, ListOrdered } from "lucide-react";
+import { UserIcon, LogOut, Package, ShieldCheck, User } from "lucide-react";
 
 const UserButton = () => {
-  // ⭐ 1. Legge lo stato e i dati dell'utente tramite hook
   const { data: session, status } = useSession();
   const isAuthenticated = status === "authenticated";
 
-  // 2. Se NON autenticato, mostra il link Sign In
   if (!isAuthenticated) {
     return (
-      <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white">
+      <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium">
         <Link href="/sign-in">
-          <UserIcon className="w-5 h-5 mr-2" />
+          <UserIcon className="w-4 h-4 mr-2" />
           Accedi
         </Link>
       </Button>
     );
   }
 
-  const isAdmin = session.user?.role?.toUpperCase() === "ADMIN";
+  const userRole = session?.user?.role?.toLowerCase();
+  const isAdmin = userRole === "admin";
 
-  // 3. Se AUTENTICATO, mostra il dropdown
-  const firstInitial = session.user?.name?.charAt(0).toUpperCase() ?? "U";
+  const firstInitial = session?.user?.name?.charAt(0).toUpperCase() ?? "U";
 
   return (
     <div className="flex gap-2 items-center">
@@ -45,55 +40,62 @@ const UserButton = () => {
           <div className="flex items-center">
             <Button
               variant="ghost"
-              className="relative w-8 h-8 rounded-full ml-2 flex items-center justify-center bg-gray-200"
+              className="relative w-9 h-9 rounded-full ml-1 flex items-center justify-center bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 font-bold border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-200 transition"
             >
               {firstInitial}
             </Button>
           </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56" align="end" forceMount>
-          {/* Informazioni Utente (include il Ruolo per debug/verifica) */}
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
-              <div className="text-sm font-medium leading-none">
-                {session.user?.name}
+              <div className="text-sm font-semibold leading-none">
+                {session?.user?.name}
               </div>
-              <div className="text-sm text-muted-foreground leading-none">
-                {session.user?.email}
+              <div className="text-xs text-muted-foreground leading-none">
+                {session?.user?.email}
               </div>
-              {/* ⭐ DEBUG: MOSTRA IL RUOLO LETTO DAL CLIENT */}
-              <div
-                className={`text-xs leading-none ${isAdmin ? "text-red-500 font-semibold" : "text-blue-500"}`}
-              >
-                Ruolo: {session.user?.role || "Non Definito"}
-              </div>
+              {isAdmin && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300 w-fit mt-1">
+                  Amministratore
+                </span>
+              )}
             </div>
           </DropdownMenuLabel>
 
           <DropdownMenuSeparator />
 
-          {/* ⭐ NUOVO: Link all'Area Admin, visibile solo se isAdmin è true */}
+          {/* Profilo */}
+          <DropdownMenuItem asChild>
+            <Link href="/dashboard/profile" className="flex items-center w-full cursor-pointer">
+              <User className="w-4 h-4 mr-2 text-gray-500" />
+              Il Mio Profilo
+            </Link>
+          </DropdownMenuItem>
+
+          {/* I Miei Ordini */}
+          <DropdownMenuItem asChild>
+            <Link href="/dashboard/orders" className="flex items-center w-full cursor-pointer">
+              <Package className="w-4 h-4 mr-2 text-gray-500" />
+              I Miei Ordini
+            </Link>
+          </DropdownMenuItem>
+
+          {/* Area Admin (solo per admin) */}
           {isAdmin && (
             <DropdownMenuItem asChild>
-              <Link href="dashboard/admin" className="flex items-center w-full">
-                <ListOrdered className="w-4 h-4 mr-2" />
-                Area Admin
+              <Link href="/dashboard/admin" className="flex items-center w-full cursor-pointer font-medium text-indigo-600 dark:text-indigo-400">
+                <ShieldCheck className="w-4 h-4 mr-2" />
+                Pannello Admin
               </Link>
             </DropdownMenuItem>
           )}
 
-          {/* Link alla Dashboard Ordini standard (per tutti) */}
-          <DropdownMenuItem asChild>
-            <Link href="/dashboard/orders" className="flex items-center w-full">
-              <Package className="w-4 h-4 mr-2" />I Miei Ordini
-            </Link>
-          </DropdownMenuItem>
-
           <DropdownMenuSeparator />
 
-          {/* Funzione di Logout Diretta */}
+          {/* Logout */}
           <DropdownMenuItem
-            className="text-red-500 focus:text-red-600 cursor-pointer"
+            className="text-red-600 dark:text-red-400 focus:text-red-700 cursor-pointer"
             onClick={() => signOut({ callbackUrl: "/" })}
           >
             <LogOut className="w-4 h-4 mr-2" />

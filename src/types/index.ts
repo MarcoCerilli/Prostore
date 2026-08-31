@@ -2,15 +2,12 @@ import z from "zod";
 import {
   insertProductschema,
   insertCartSchema,
-  cartItemSchema, // Non usato direttamente, ma importante per Zod
   shippingAddressSchema,
-  insertOrderItemSchema,
   insertOrderSchema,
-  OrderItemSchema,
   paymentResultSchema,
+  insertReviewSchema,
 } from "@/lib/validators";
 import { OrderItem } from "./order";
-import { insertReviewSchema } from "@/lib/validators";
 // -----------------------------------------------------------
 // 1. Tipi per i prodotti e gli articoli del carrello
 // -----------------------------------------------------------
@@ -18,6 +15,7 @@ import { insertReviewSchema } from "@/lib/validators";
 export type Product = z.infer<typeof insertProductschema> & {
   id: string;
   rating: number;
+  numReviews: number;
   createdAt: Date;
   price: number;
 };
@@ -87,9 +85,8 @@ export type Order = z.infer<typeof insertOrderSchema> & {
   status: OrderStatus;
   orderItems: OrderItem[];
   user: { name: string; email: string };
-  isPaid: Boolean;
-  paymentResult: paymentResult
-
+  isPaid: boolean;
+  paymentResult: paymentResult;
 };
 // Tipo payload per la Server Action (Order creation)
 export interface CheckoutPayload {

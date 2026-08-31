@@ -6,8 +6,8 @@ import { convertToPlainObject, formatError } from "../utils"; // Import non usat
 import { prisma } from "@/db/prisma"; // Connessione al database (Prisma Client)
 import { revalidatePath } from "next/cache";
 import { insertProductschema, updateProductSchema } from "../validators";
-import z, { success } from "zod";
-import { Prisma } from "../generated/prisma/browser";
+import z from "zod";
+import { Prisma } from "@prisma/client";
 
 const PAGE_SIZE = 20; // Ad esempio, 10 prodotti per pagina. Puoi regolarlo a piacere.
 
@@ -17,25 +17,14 @@ export async function getLatestProducts(): Promise<Product[] | null> {
     // 1. Fetch dei dati da Prisma
     const rawProducts = await prisma.product.findMany({
       orderBy: { createdAt: "desc" },
-      take: 8,
+      take: LATEST_PRODUCTS_LIMIT,
     });
 
-    // 🛑 NUOVO LOG PER DEBUGGING: verifica i dati grezzi
-    console.log("DEBUG: rawProducts count:", rawProducts.length);
-    console.log("DEBUG: Esempio di prodotto grezzo:", rawProducts[0]);
-
-    // 2. Serializzazione Universale
-    const serializedProducts = JSON.parse(JSON.stringify(rawProducts));
-
-    // 🛑 NUOVO LOG PER DEBUGGING: verifica la serializzazione
-    console.log("DEBUG: serializedProducts count:", serializedProducts.length);
-
-    // 3. Mappatura finale per conversione da stringa a numero (se necessario)
-    const latestProducts: Product[] = serializedProducts.map((p: any) => ({
+    // 2. Mappatura finale per conversione da Decimal a number
+    const latestProducts: Product[] = rawProducts.map((p) => ({
       ...p,
-      price: parseFloat(p.price),
-      rating: parseFloat(p.rating),
-      createdAt: new Date(p.createdAt),
+      price: Number(p.price),
+      rating: Number(p.rating),
     }));
 
     return latestProducts;
@@ -212,14 +201,14 @@ export async function deleteProduct(id: string) {
     if (!productExists) throw new Error("Prodotto non trovato");
     await prisma.product.delete({ where: { id } });
 
-    revalidatePath("/admin/products");
+    revalidatePath("/dashboard/admin/products");
 
     return {
       success: true,
       message: "Prodotto cancellato con successo!",
     };
   } catch (error) {
-    return { success: false, message: formatError };
+    return { success: false, message: await formatError(error) };
   }
 }
 
@@ -229,14 +218,14 @@ export async function createProduct(data: z.infer<typeof insertProductschema>) {
     const product = insertProductschema.parse(data);
     await prisma.product.create({ data: product });
 
-    revalidatePath("/admin/products");
+    revalidatePath("/dashboard/admin/products");
 
     return {
       success: true,
       message: "Prodotto creato con successo!",
     };
   } catch (error) {
-    return { success: false, message: formatError(error) };
+    return { success: false, message: await formatError(error) };
   }
 }
 
@@ -255,14 +244,14 @@ export async function updateProduct(data: z.infer<typeof updateProductSchema>) {
       data: product,
     });
 
-    revalidatePath("/admin/products");
+    revalidatePath("/dashboard/admin/products");
 
     return {
       success: true,
       message: "Prodotto aggiornato con successo!",
     };
   } catch (error) {
-    return { success: false, message: formatError(error) };
+    return { success: false, message: await formatError(error) };
   }
 }
 
@@ -282,20 +271,13 @@ export async function getAllCategories() {
     },
   });
 
-  //  1. CONVERSIONE FORZATA JSON PER ELIMINARE METODI NASCOSTI
-  // Questa riga rimuove i metodi e le funzioni interne di Prisma.
-  const categoriesJson = JSON.stringify(data);
-  const safeCategories = JSON.parse(categoriesJson);
-
-  //  2. MAPPA PER GARANTIRE IL FORMATO CORRETTO (Opzionale, ma consigliato)
-  // Questo ti assicura che il formato sia Category[] pulito:
-  return safeCategories
-  .filter((item: any)=> item.category && item.category !== 'all') // Filtra eventuali categorie nulle o "all"
-  .map((item: any) => ({
-    name: item.category,
-    slug: createSlug(item.category),
-    _count: item._count.id,
-  }));
+  return data
+    .filter((item) => item.category && item.category !== "all")
+    .map((item) => ({
+      name: item.category,
+      slug: createSlug(item.category),
+      _count: item._count.id,
+    }));
 }
 
 //Otteniamo prodotti in vetrina

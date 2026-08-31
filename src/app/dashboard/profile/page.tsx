@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ProfileForm from "@/components/forms/ProfileForm"; 
 import PasswordForm from "@/components/forms/PasswordForm"; 
 import { Separator } from "@/components/ui/separator";
-import { getFullUser } from "@/lib/actions/user.actions"; // Importazione corretta
+import { getFullUser } from "@/lib/actions/user.actions";
 
 
 // Componente Server-Side per la Pagina
@@ -62,25 +63,25 @@ export default async function ProfilePage() {
                             <PasswordForm userId={user.id} />
                         ) : (
                             <p className="text-sm text-gray-500">
-                                Hai effettuato l'accesso tramite un provider esterno (es. Google). Non è necessaria una password.
+                                Hai effettuato l&apos;accesso tramite un provider esterno (es. Google). Non è necessaria una password.
                             </p>
                         )}
                     </CardContent>
                 </Card>
             </section>
 
-            {/* Sezione 3: Link agli Ordini (Accesso alla lista che abbiamo appena sistemato) */}
+            {/* Sezione 3: Link agli Ordini */}
             <section id="orders-link">
                 <h2 className="text-2xl font-semibold mb-4 mt-8">I Miei Ordini</h2>
                 
-                <Card className="max-w-4xl p-6 flex justify-between items-center bg-blue-50/50">
+                <Card className="max-w-4xl p-6 flex justify-between items-center bg-indigo-50/50 dark:bg-zinc-850">
                     <p className="text-lg font-medium">Visualizza lo storico completo dei tuoi ordini.</p>
-                    <a 
-                        href="/dashboard/profile/orders" 
+                    <Link 
+                        href="/dashboard/orders" 
                         className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow transition-colors hover:bg-indigo-700"
                     >
                         Vai agli Ordini &rarr;
-                    </a>
+                    </Link>
                 </Card>
             </section>
         </div>

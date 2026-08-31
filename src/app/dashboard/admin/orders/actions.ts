@@ -7,7 +7,7 @@ import { orderStatus } from "@prisma/client";
 export async function deleteOrderAction(orderId: string) {
   try {
     await prisma.order.delete({ where: { id: orderId } });
-    revalidatePath("/admin/orders");
+    revalidatePath("/dashboard/admin/orders");
     return { success: true };
   } catch (error) {
     console.error("Errore eliminazione ordine:", error);
@@ -21,7 +21,7 @@ export async function updateOrderStatusAction(orderId: string, newStatus: string
       where: { id: orderId },
       data: { status: newStatus as orderStatus },
     });
-    revalidatePath("/admin/orders");
+    revalidatePath("/dashboard/admin/orders");
     return { success: true };
   } catch (error) {
     console.error("Errore aggiornamento ordine:", error);

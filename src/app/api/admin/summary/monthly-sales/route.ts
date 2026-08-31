@@ -9,11 +9,11 @@ interface DailySale {
     sales: number;
 }
 
-export async function GET(request: Request) {
+export async function GET() {
     const session = await auth();
     
-    // 🛑 SEZIONE 98: Protezione della rotta Admin
-    if (!session || session.user.role !== 'admin') { 
+    // Protezione della rotta Admin
+    if (!session || session.user.role?.toLowerCase() !== 'admin') { 
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

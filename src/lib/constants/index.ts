@@ -1,11 +1,11 @@
 import { shippingAddress } from "@/types";
 
-export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Il Tuo Nome Default";
+export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "ModernStore";
 export const APP_DESCRIPTION =
   process.env.NEXT_PUBLIC_APP_DESCRIPTION ||
-  "E-commerce moderno sviluppato NEXT.JS";
+  "ModernStore - Abbigliamento e Moda Contemporanea di Alta Qualità";
 export const SERVER_URL =
-  process.env.NEXT_PUBLIC_SERVER_URL || "https://prostore-gamma-six.vercel.app";
+  process.env.NEXT_PUBLIC_SERVER_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 export const LATEST_PRODUCTS_LIMIT =
   Number(process.env.LATEST_PRODUCTS_LIMIT) || 4;

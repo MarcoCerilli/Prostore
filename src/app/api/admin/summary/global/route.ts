@@ -15,11 +15,11 @@ interface GlobalSummary {
  * Gestisce la richiesta GET all'API /api/admin/summary/global
  * per fornire statistiche aggregate per le schede di riepilogo.
  */
-export async function GET(request: Request) {
+export async function GET() {
   const session = await auth();
 
-  // 🛑 Protezione della rotta Admin
-  if (!session || session.user.role !== "admin") {
+  // Protezione della rotta Admin
+  if (!session || session.user.role?.toLowerCase() !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
