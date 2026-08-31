@@ -50,6 +50,24 @@ export default async function RootLayout({
 
   return (
     <html lang="it" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== "undefined" && window.performance && window.performance.measure) {
+                const _origMeasure = window.performance.measure.bind(window.performance);
+                window.performance.measure = function(name, startMark, endMark) {
+                  try {
+                    return _origMeasure(name, startMark, endMark);
+                  } catch (e) {
+                    // Previene il crash in dev dovuto al clock skew di WSL
+                  }
+                };
+              }
+            `,
+          }}
+        />
+      </head>
       <body className={`${inter.className} antialiased`}>
         <ThemeProvider
           attribute="class"

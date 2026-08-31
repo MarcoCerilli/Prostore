@@ -3,7 +3,9 @@ import { shippingAddress } from "@/types";
 import { shippingAddressValues } from "@/lib/constants";
 import { getUserById } from "@/lib/actions/user.actions";
 import { auth } from "@/auth";
-import "server-only"; // IMPORTANTE: Forza Next.js a trattare questo come Server Component esclusivo
+import "server-only";
+
+export const dynamic = "force-dynamic";
 
 // Componenti Client
 import CheckoutClientWrapper from "./CheckoutClientWrapper";
