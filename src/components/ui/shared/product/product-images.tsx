@@ -1,81 +1,114 @@
 "use client";
+
 import { useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import {
+  DEFAULT_PRODUCT_PLACEHOLDER,
+  normalizeProductImages,
+} from "@/lib/image-utils";
+import { ImageIcon } from "lucide-react";
 
-const ProductImages = ({ images }: { images: string[] }) => {
+interface ProductImagesProps {
+  images?: string[] | string | null;
+}
+
+const ProductImages = ({ images }: ProductImagesProps) => {
   const [current, setCurrent] = useState(0);
-  // URL placeholder nel caso l'immagine non sia valida o l'array sia vuoto
-  const placeholderUrl =
-    "https://placehold.co/1000x1000/E5E7EB/4B5563?text=Nessuna+Immagine";
+  // Traccia gli indici delle immagini che hanno generato errore di caricamento
+  const [failedIndices, setFailedIndices] = useState<Record<number, boolean>>({});
 
-  // --- Gestione Dati Vuoti ---
-  if (!images || images.length === 0) {
+  const validImages = normalizeProductImages(images);
+
+  // Se non ci sono immagini nel prodotto
+  if (validImages.length === 0) {
     return (
       <div className="space-y-4">
-        {/* Usiamo <Image> anche per il placeholder */}
-        <Image
-          src={placeholderUrl}
-          alt="Immagine non disponibile"
-          width={1000}
-          height={1000}
-          priority // Carica subito il placeholder se non ci sono immagini
-          className="w-full h-auto min-h-[300px] object-cover object-center rounded-xl shadow-lg"
-        />
+        <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-muted/30 border border-border/60 shadow-md flex flex-col items-center justify-center p-6 text-center">
+          <Image
+            src={DEFAULT_PRODUCT_PLACEHOLDER}
+            alt="Immagine non disponibile"
+            fill
+            unoptimized
+            priority
+            className="object-contain p-8 opacity-70"
+          />
+          <div className="relative z-10 mt-auto bg-background/80 backdrop-blur-md px-4 py-1.5 rounded-full border border-border/50 text-xs text-muted-foreground flex items-center gap-1.5 shadow-xs">
+            <ImageIcon className="w-3.5 h-3.5" />
+            <span>Nessuna immagine disponibile</span>
+          </div>
+        </div>
       </div>
     );
   }
 
-  // --- Renderizzazione con Immagini ---
+  // Se l'indice selezionato supera la lunghezza, resettiamo a 0
+  const activeIndex = current < validImages.length ? current : 0;
+  const isCurrentFailed = !!failedIndices[activeIndex];
+  const activeImageSrc = isCurrentFailed
+    ? DEFAULT_PRODUCT_PLACEHOLDER
+    : validImages[activeIndex];
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full">
       {/* 1. Immagine Principale */}
-      <div className="relative w-full aspect-square min-h-[300px]">
+      <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-muted/20 border border-border/60 shadow-lg">
         <Image
-          src={images[current]} // L'URL dell'immagine selezionata
-          alt="Immagine principale del prodotto"
-          fill // Usa 'fill' in un contenitore relativo per rispettare l'aspect ratio
-          sizes="(max-width: 768px) 100vw, 50vw" // Ottimizzazione
-          className="object-cover object-center rounded-xl shadow-lg"
-          // In caso di errore nel caricamento dell'immagine, reindirizziamo al placeholder
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = placeholderUrl;
+          key={`main-${activeIndex}-${activeImageSrc}`}
+          src={activeImageSrc}
+          alt={`Immagine principale del prodotto ${activeIndex + 1}`}
+          fill
+          unoptimized
+          priority
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 40vw"
+          className="object-cover object-center transition-all duration-300"
+          onError={() => {
+            if (!failedIndices[activeIndex]) {
+              setFailedIndices((prev) => ({ ...prev, [activeIndex]: true }));
+            }
           }}
         />
       </div>
 
-      {/* 2. Miniatura (Galleria interattiva) */}
-      <div className="flex overflow-x-auto p-1">
-        {images.map((image, index) => (
-          // Contenitore della singola miniatura
-          <div
-            key={image}
-            // LOGICA DI INTERAZIONE: Al click, imposta l'indice corrente
-            onClick={() => setCurrent(index)}
-            className={cn(
-              "border-2 mr-2 cursor-pointer transition duration-200 p-1 rounded-md flex-shrink-0",
-              "hover:border-indigo-600",
-              current === index
-                ? "border-indigo-500 scale-105" // Miniatura selezionata
-                : "border-gray-200 opacity-75" // Miniatura non selezionata
-            )}
-          >
-            {/* Immagine Miniatura */}
-            <div className="relative w-20 h-20">
-              <Image
-                src={image || placeholderUrl}
-                alt={`Miniatura ${index + 1}`}
-                fill
-                sizes="100px"
-                className="object-cover rounded-sm"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = placeholderUrl;
-                }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* 2. Miniature (mostrate solo se c'è più di una immagine) */}
+      {validImages.length > 1 && (
+        <div className="flex gap-2.5 overflow-x-auto pb-2 pt-1 scrollbar-thin">
+          {validImages.map((image, index) => {
+            const isThumbFailed = !!failedIndices[index];
+            const thumbSrc = isThumbFailed ? DEFAULT_PRODUCT_PLACEHOLDER : image;
+            const isSelected = activeIndex === index;
+
+            return (
+              <button
+                type="button"
+                key={`${image}-${index}`}
+                onClick={() => setCurrent(index)}
+                aria-label={`Visualizza immagine ${index + 1}`}
+                className={cn(
+                  "relative w-20 h-20 rounded-xl overflow-hidden border-2 flex-shrink-0 transition-all duration-200 bg-muted/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500",
+                  isSelected
+                    ? "border-indigo-600 dark:border-indigo-400 ring-2 ring-indigo-600/30 scale-105 shadow-sm"
+                    : "border-border/60 hover:border-indigo-300 dark:hover:border-indigo-700 opacity-75 hover:opacity-100"
+                )}
+              >
+                <Image
+                  src={thumbSrc}
+                  alt={`Miniatura ${index + 1}`}
+                  fill
+                  unoptimized
+                  sizes="80px"
+                  className="object-cover"
+                  onError={() => {
+                    if (!failedIndices[index]) {
+                      setFailedIndices((prev) => ({ ...prev, [index]: true }));
+                    }
+                  }}
+                />
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

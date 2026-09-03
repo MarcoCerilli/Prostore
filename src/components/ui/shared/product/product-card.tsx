@@ -4,11 +4,12 @@ import Link from "next/link";
 import ProductPrice from "./product-price";
 import { Product } from "@/types";
 import Rating from "../../rating";
+import { normalizeProductImage } from "@/lib/image-utils";
 
 const ProductCard = ({ product }: { product: Product }) => {
-  const imageUrl =
-    (Array.isArray(product.images) && product.images[0]) ||
-    "https://i.placehold.co/300x300/e5e7eb/777777?text=No+Image";
+  const imageUrl = normalizeProductImage(
+    Array.isArray(product.images) ? product.images[0] : (product.images as unknown as string)
+  );
 
   const priceNum = Number(product.price) || 0;
   const installment = (priceNum / 3).toFixed(2);
@@ -22,6 +23,7 @@ const ProductCard = ({ product }: { product: Product }) => {
               src={imageUrl}
               alt={product.name}
               fill
+              unoptimized
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               priority={false}
               className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"

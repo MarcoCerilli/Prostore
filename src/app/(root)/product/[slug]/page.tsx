@@ -16,6 +16,7 @@ import {
   InstallmentBanner,
   PaymentBadgesList,
 } from "@/components/ui/shared/payment-badges";
+import { normalizeProductImage } from "@/lib/image-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -184,7 +185,11 @@ const ProductDetailsPage = async (props: {
                       slug: product.slug,
                       price: productPriceNumber,
                       quantity: 1,
-                      image: product.images?.[0] || "",
+                      image: normalizeProductImage(
+                        Array.isArray(product.images)
+                          ? product.images[0]
+                          : (product.images as unknown as string)
+                      ),
                     }}
                   />
                 </div>
